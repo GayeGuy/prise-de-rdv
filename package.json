@@ -1,0 +1,15 @@
+{
+  "name": "rendez-vous-app",
+  "version": "2.0.0",
+  "type": "module",
+  "description": "Application web de gestion de rendez-vous pour plaques d'immatriculation",
+  "scripts": {
+    "install:all": "cd backend && npm install && cd ../frontend && npm install && cd ..",
+    "dev": "concurrently \"npm -C backend run dev\" \"npm -C frontend run dev\"",
+    "test": "cd backend && npm test",
+    "build": "npm -C frontend run build"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0"
+  }
+}

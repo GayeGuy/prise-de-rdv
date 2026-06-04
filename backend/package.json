@@ -1,0 +1,14 @@
+{
+  "name": "rendez-vous-backend",
+  "type": "module",
+  "version": "2.0.0",
+  "scripts": {
+    "dev": "node --watch server.js",
+    "start": "node server.js",
+    "test": "node --test tests/*.test.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "cors": "^2.8.5"
+  }
+}

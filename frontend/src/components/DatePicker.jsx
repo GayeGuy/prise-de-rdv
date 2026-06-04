@@ -73,9 +73,9 @@ export default function DatePicker({ availableDates, selectedDate, onDateChange,
       )}
       
       <div className="calendar-header">
-        <button type="button" onClick={prevMonth} className="nav-btn">← Précédent</button>
+        <button type="button" onClick={prevMonth} className="nav-btn" aria-label="Mois précédent">←</button>
         <h3>{months[currentMonth.getMonth()]} {currentMonth.getFullYear()}</h3>
-        <button type="button" onClick={nextMonth} className="nav-btn">Suivant →</button>
+        <button type="button" onClick={nextMonth} className="nav-btn" aria-label="Mois suivant">→</button>
       </div>
 
       <div className="calendar-grid">

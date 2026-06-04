@@ -10,42 +10,73 @@ import { Alert } from '../ui/Alert';
 import { FormField } from '../ui/FormField';
 import { validateForm } from '../utils/validation';
 
+// ── Popup de confirmation ────────────────────────────────────────────────────
+function ConfirmModal({ onConfirm, onCancel }) {
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 1000, padding: '16px',
+    }}>
+      <div style={{
+        background: 'white', borderRadius: '12px', padding: '28px 24px',
+        maxWidth: '380px', width: '100%',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
+        textAlign: 'center',
+      }}>
+        <div style={{ fontSize: '40px', marginBottom: '12px' }}>📋</div>
+        <h3 style={{ color: '#0f172a', marginBottom: '8px', fontSize: '17px' }}>
+          Confirmer la réservation
+        </h3>
+        <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '24px', lineHeight: 1.5 }}>
+          Êtes-vous certain(e) de vouloir prendre ce rendez-vous ?
+        </p>
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+          <button
+            onClick={onConfirm}
+            style={{
+              flex: 1, padding: '10px 0', borderRadius: '8px',
+              background: '#3b82f6', color: 'white', border: 'none',
+              fontWeight: '600', fontSize: '15px', cursor: 'pointer',
+            }}
+          >
+            Oui
+          </button>
+          <button
+            onClick={onCancel}
+            style={{
+              flex: 1, padding: '10px 0', borderRadius: '8px',
+              background: '#f1f5f9', color: '#334155', border: '1px solid #e2e8f0',
+              fontWeight: '600', fontSize: '15px', cursor: 'pointer',
+            }}
+          >
+            Non
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function BookingPageValidated() {
   const [selectedCentre, setSelectedCentre] = useState(null);
   const [availableDates, setAvailableDates] = useState([]);
   const [result, setResult] = useState(null);
   const [showAlert, setShowAlert] = useState(null);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [pendingSubmit, setPendingSubmit] = useState(null);
 
   const { data: centres, loading: centresLoading, error: centresError } = useAPI(
     () => api.getCentres(),
-    {
-      onSuccess: (data) => console.log('Centres loaded:', data.length),
-      onError: (err) => console.error('Failed to load centres:', err)
-    }
+    { onSuccess: (data) => console.log('Centres loaded:', data.length) }
   );
 
   const {
-    formData,
-    setFormData,
-    errors,
-    touched,
-    isSubmitting,
-    handleChange,
-    handleBlur,
-    handleSubmit: originalHandleSubmit,
-    reset
+    formData, setFormData, errors, touched,
+    isSubmitting, handleChange, handleBlur,
+    handleSubmit: originalHandleSubmit, reset
   } = useForm(
-    {
-      centreId: '',
-      nom: '',
-      prenom: '',
-      phone: '',
-      email: '',
-      date: '',
-      chrono: '',
-      immatriculation: '',
-      vin: ''
-    },
+    { centreId: '', nom: '', prenom: '', phone: '', email: '', date: '', chrono: '', immatriculation: '', vin: '' },
     async (data) => {
       try {
         const appointment = await api.createAppointment(data);
@@ -66,7 +97,6 @@ export default function BookingPageValidated() {
     setFormData(prev => ({ ...prev, centreId }));
     setSelectedCentre(centre);
     setAvailableDates([]);
-
     if (centreId) {
       api.getCentreAvailability(centreId, 30)
         .then(data => setAvailableDates(data))
@@ -74,30 +104,67 @@ export default function BookingPageValidated() {
     }
   };
 
+  // Intercepter la soumission pour afficher le popup
   const handleSubmit = async (e) => {
-    await originalHandleSubmit(e);
+    e.preventDefault();
+    // Valider d'abord le formulaire via originalHandleSubmit
+    // On stocke l'event et on affiche le popup seulement si le formulaire est valide
+    const fakeE = { preventDefault: () => {} };
+    // Déclencher la validation sans soumettre
+    await originalHandleSubmit({
+      ...fakeE,
+      _dryRun: true,
+      preventDefault: () => {},
+    });
+
+    // Vérifier les erreurs de validation manuellement
+    const isPIMO = selectedCentre?.type === 'PIMO';
+    const hasErrors =
+      !formData.nom?.trim() || !formData.prenom?.trim() || !formData.phone?.trim() ||
+      !formData.centreId || !formData.date ||
+      (isPIMO && (!formData.chrono?.trim() || !formData.vin?.trim() || !formData.immatriculation?.trim()));
+
+    if (hasErrors) {
+      await originalHandleSubmit(e);
+      return;
+    }
+
+    // Formulaire valide → afficher le popup
+    setPendingSubmit(e);
+    setShowConfirm(true);
+  };
+
+  const handleConfirmYes = async () => {
+    setShowConfirm(false);
+    if (pendingSubmit) await originalHandleSubmit(pendingSubmit);
+    setPendingSubmit(null);
+  };
+
+  const handleConfirmNo = () => {
+    setShowConfirm(false);
+    setPendingSubmit(null);
   };
 
   if (centresLoading) {
-    return (
-      <div className="container">
-        <Card><div className="loading">Chargement des centres...</div></Card>
-      </div>
-    );
+    return <Card><div className="loading">Chargement des centres...</div></Card>;
   }
 
   if (centresError) {
     return (
-      <div className="container">
-        <Alert type="error" onClose={() => window.location.reload()}>
-          Impossible de charger les centres : {centresError.message}
-        </Alert>
-      </div>
+      <Alert type="error" onClose={() => window.location.reload()}>
+        Impossible de charger les centres : {centresError.message}
+      </Alert>
     );
   }
 
+  const isPIMO = selectedCentre?.type === 'PIMO';
+
   return (
-    <div className="container">
+    <>
+      {showConfirm && (
+        <ConfirmModal onConfirm={handleConfirmYes} onCancel={handleConfirmNo} />
+      )}
+
       {showAlert && (
         <Alert type={showAlert.type} onClose={() => setShowAlert(null)}>
           {showAlert.text}
@@ -113,26 +180,21 @@ export default function BookingPageValidated() {
           <CardBody>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <tbody>
-                <tr>
-                  <td style={{ padding: '12px', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }}>Référence</td>
-                  <td style={{ padding: '12px', borderBottom: '1px solid #e5e7eb', fontWeight: 'bold' }}>{result.reference}</td>
-                </tr>
-                <tr>
-                  <td style={{ padding: '12px', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }}>Date</td>
-                  <td style={{ padding: '12px', borderBottom: '1px solid #e5e7eb' }}>{new Date(result.date).toLocaleDateString('fr-FR')}</td>
-                </tr>
-                <tr>
-                  <td style={{ padding: '12px', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }}>Nom</td>
-                  <td style={{ padding: '12px', borderBottom: '1px solid #e5e7eb' }}>{result.prenom} {result.nom}</td>
-                </tr>
-                <tr>
-                  <td style={{ padding: '12px', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }}>Téléphone</td>
-                  <td style={{ padding: '12px', borderBottom: '1px solid #e5e7eb' }}>{result.phone}</td>
-                </tr>
+                {[
+                  ['Référence', result.reference],
+                  ['Date', new Date(result.date).toLocaleDateString('fr-FR')],
+                  ['Nom', `${result.prenom} ${result.nom}`],
+                  ['Téléphone', result.phone],
+                ].map(([label, value]) => (
+                  <tr key={label}>
+                    <td style={{ padding: '12px', fontWeight: '600', borderBottom: '1px solid #e5e7eb', width: '40%' }}>{label}</td>
+                    <td style={{ padding: '12px', borderBottom: '1px solid #e5e7eb' }}>{value}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
-            <p style={{ marginTop: '24px', color: '#475569', fontSize: '14px' }}>
-              Un PDF de confirmation a été ouvert. Vous pouvez l'imprimer ou le télécharger.
+            <p style={{ marginTop: '20px', color: '#475569', fontSize: '14px' }}>
+              Le PDF de confirmation est ouvert dans un nouvel onglet. Vous pouvez l'imprimer ou le télécharger.
             </p>
           </CardBody>
           <CardFooter>
@@ -149,121 +211,41 @@ export default function BookingPageValidated() {
           <CardBody>
             <form onSubmit={handleSubmit}>
               <div className="grid-2">
-                <FormField
-                  label="Nom"
-                  name="nom"
-                  value={formData.nom}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                  error={errors.nom}
-                  touched={touched.nom}
-                  required
-                  placeholder="DUPONT"
-                />
-                <FormField
-                  label="Prénom"
-                  name="prenom"
-                  value={formData.prenom}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                  error={errors.prenom}
-                  touched={touched.prenom}
-                  required
-                  placeholder="JEAN"
-                />
+                <FormField label="Nom" name="nom" value={formData.nom} onChange={handleChange} onBlur={handleBlur} error={errors.nom} touched={touched.nom} required placeholder="DUPONT" />
+                <FormField label="Prénom" name="prenom" value={formData.prenom} onChange={handleChange} onBlur={handleBlur} error={errors.prenom} touched={touched.prenom} required placeholder="JEAN" />
               </div>
 
               <div className="grid-2">
-                <FormField
-                  label="Téléphone (10 chiffres)"
-                  name="phone"
-                  type="tel"
-                  value={formData.phone}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                  error={errors.phone}
-                  touched={touched.phone}
-                  required
-                  placeholder="0601020304"
-                  maxLength={10}
-                />
-                <FormField
-                  label="Email"
-                  name="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                  error={errors.email}
-                  touched={touched.email}
-                  placeholder="jean@example.com"
-                />
+                <FormField label="Téléphone (10 chiffres)" name="phone" type="tel" value={formData.phone} onChange={handleChange} onBlur={handleBlur} error={errors.phone} touched={touched.phone} required placeholder="0601020304" maxLength={10} />
+                <FormField label="Email" name="email" type="email" value={formData.email} onChange={handleChange} onBlur={handleBlur} error={errors.email} touched={touched.email} placeholder="jean@example.com" />
               </div>
 
-              <FormField label="Centre" name="centreId">
+              <FormField label="Centre *" name="centreId">
                 <select
                   name="centreId"
                   value={formData.centreId}
                   onChange={handleCentreChange}
                   onBlur={handleBlur}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    borderRadius: '6px',
-                    border: errors.centreId && touched.centreId ? '2px solid #ef4444' : '1px solid #cbd5e1',
-                    fontSize: '14px'
-                  }}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: errors.centreId && touched.centreId ? '2px solid #ef4444' : '1px solid #e2e8f0', fontSize: '14px' }}
                 >
                   <option value="">-- Sélectionner un centre --</option>
-                  {centres?.map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
+                  {centres?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </FormField>
 
-              {selectedCentre?.type === 'PIMO' && (
+              {isPIMO && (
                 <>
                   <div className="grid-2">
-                    <FormField
-                      label="Numéro Chrono (chiffres et lettres)"
-                      name="chrono"
-                      value={formData.chrono}
-                      onChange={handleChange}
-                      onBlur={handleBlur}
-                      error={errors.chrono}
-                      touched={touched.chrono}
-                      required
-                      placeholder="ABC123"
-                    />
-                    <FormField
-                      label="VIN (chiffres et lettres)"
-                      name="vin"
-                      value={formData.vin}
-                      onChange={handleChange}
-                      onBlur={handleBlur}
-                      error={errors.vin}
-                      touched={touched.vin}
-                      placeholder="VF3AB123CD456789"
-                      maxLength={17}
-                    />
+                    <FormField label="Numéro Chrono *" name="chrono" value={formData.chrono} onChange={handleChange} onBlur={handleBlur} error={errors.chrono} touched={touched.chrono} required placeholder="ABC123" />
+                    <FormField label="VIN *" name="vin" value={formData.vin} onChange={handleChange} onBlur={handleBlur} error={errors.vin} touched={touched.vin} required placeholder="VF3AB123CD456789" maxLength={17} />
                   </div>
-                  <FormField
-                    label="Immatriculation"
-                    name="immatriculation"
-                    value={formData.immatriculation}
-                    onChange={handleChange}
-                    onBlur={handleBlur}
-                    error={errors.immatriculation}
-                    touched={touched.immatriculation}
-                    required
-                    placeholder="AA-123-XX"
-                  />
+                  <FormField label="Immatriculation *" name="immatriculation" value={formData.immatriculation} onChange={handleChange} onBlur={handleBlur} error={errors.immatriculation} touched={touched.immatriculation} required placeholder="AA-123-XX" />
                 </>
               )}
 
               {selectedCentre && (
-                <div style={{ marginBottom: '24px' }}>
-                  <label style={{ display: 'block', marginBottom: '12px', fontWeight: '500', color: '#1e293b' }}>
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{ display: 'block', marginBottom: '10px', fontWeight: '500', color: '#1e293b', fontSize: '14px' }}>
                     Sélectionner une date *
                   </label>
                   <DatePicker
@@ -274,34 +256,22 @@ export default function BookingPageValidated() {
                     centreCapacity={selectedCentre.dailyCapacity}
                   />
                   {errors.date && touched.date && (
-                    <p style={{ color: '#ef4444', fontSize: '12px', marginTop: '8px' }}>{errors.date}</p>
+                    <p style={{ color: '#ef4444', fontSize: '12px', marginTop: '6px' }}>{errors.date}</p>
                   )}
                 </div>
               )}
 
-              <div style={{
-                background: '#f0f9ff',
-                border: '1px solid #bfdbfe',
-                borderRadius: '8px',
-                padding: '12px',
-                marginBottom: '24px',
-                fontSize: '13px',
-                color: '#1e40af'
-              }}>
-                ℹ️ <strong>Format des champs (appliqué automatiquement à la saisie) :</strong><br/>
-                • Téléphone : 10 chiffres uniquement<br/>
-                • Nom / Prénom : MAJUSCULES, lettres et tirets<br/>
-                • Chrono &amp; VIN : MAJUSCULES, chiffres et lettres (VIN max 17 caractères)<br/>
-                • Email : minuscules<br/>
-                • Immatriculation : MAJUSCULES, chiffres, lettres et tirets
-              </div>
-
               <Button
                 variant="primary"
                 type="submit"
-                disabled={!formData.centreId || !formData.date || !formData.nom || !formData.prenom || !formData.phone || isSubmitting}
+                disabled={
+                  !formData.centreId || !formData.date || !formData.nom ||
+                  !formData.prenom || !formData.phone ||
+                  (isPIMO && (!formData.vin || !formData.chrono || !formData.immatriculation)) ||
+                  isSubmitting
+                }
                 loading={isSubmitting}
-                style={{ width: '100%', marginTop: '24px' }}
+                style={{ width: '100%', marginTop: '8px' }}
               >
                 ✅ Confirmer la Réservation
               </Button>
@@ -309,6 +279,6 @@ export default function BookingPageValidated() {
           </CardBody>
         </Card>
       )}
-    </div>
+    </>
   );
 }

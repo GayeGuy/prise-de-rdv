@@ -136,7 +136,8 @@ export function generatePDF(appointment, centre) {
       </div>
 
       <script>
-        window.print();
+        // Pas d'impression automatique — visualisation uniquement
+        document.title = 'Confirmation RDV';
       </script>
     </body>
     </html>

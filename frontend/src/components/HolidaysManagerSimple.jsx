@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { api } from '../api';
 
 export function HolidaysManagerSimple({ centreId, onUpdate }) {
   const [holidays, setHolidays] = useState([]);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
 
   useEffect(() => {
     loadHolidays();
@@ -15,28 +15,10 @@ export function HolidaysManagerSimple({ centreId, onUpdate }) {
     try {
       setLoading(true);
       setError(null);
-      const token = localStorage.getItem('token');
-      const headers = {
-        'Content-Type': 'application/json'
-      };
-      if (token) {
-        headers.Authorization = `Bearer ${token}`;
-      }
-
-      const response = await fetch(`http://localhost:3001/api/holidays?year=${selectedYear}`, {
-        method: 'GET',
-        headers
-      });
-
-      if (!response.ok) {
-        throw new Error(`Erreur: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await api.getHolidays(selectedYear);
       setHolidays(data || []);
     } catch (err) {
       setError(err.message);
-      console.error('Error loading holidays:', err);
     } finally {
       setLoading(false);
     }
@@ -47,12 +29,6 @@ export function HolidaysManagerSimple({ centreId, onUpdate }) {
       {error && (
         <div style={{ padding: '12px', background: '#fee2e2', color: '#991b1b', borderRadius: '6px', marginBottom: '20px' }}>
           ⚠️ {error}
-        </div>
-      )}
-
-      {success && (
-        <div style={{ padding: '12px', background: '#dcfce7', color: '#166534', borderRadius: '6px', marginBottom: '20px' }}>
-          ✅ {success}
         </div>
       )}
 

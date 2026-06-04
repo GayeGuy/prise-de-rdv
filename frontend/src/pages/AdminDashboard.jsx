@@ -43,6 +43,7 @@ export default function AdminDashboard() {
   const [closureForm, setClosureForm] = useState({
     date: '',
     reason: '',
+    centreId: 'all',
   });
 
   const [holidayForm, setHolidayForm] = useState({
@@ -783,6 +784,19 @@ export default function AdminDashboard() {
               <form onSubmit={handleAddClosure}>
                 <div className="grid">
                   <div className="form-group">
+                    <label>Site *</label>
+                    <select
+                      value={closureForm.centreId}
+                      onChange={(e) => setClosureForm({ ...closureForm, centreId: e.target.value })}
+                      required
+                    >
+                      <option value="all">— Tous les sites —</option>
+                      {centres?.map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
                     <label>Date *</label>
                     <input type="date" value={closureForm.date} onChange={(e) => setClosureForm({ ...closureForm, date: e.target.value })} required />
                   </div>
@@ -820,11 +834,12 @@ export default function AdminDashboard() {
             <h3>Fermetures exceptionnelles</h3>
             <table>
               <thead>
-                <tr><th>Date</th><th>Motif</th><th>Actions</th></tr>
+                <tr><th>Site</th><th>Date</th><th>Motif</th><th>Actions</th></tr>
               </thead>
               <tbody>
                 {closures.map(c => (
                   <tr key={c.id}>
+                    <td>{c.centreId === 'all' || !c.centreId ? <em style={{color:'#64748b'}}>Tous les sites</em> : (centres?.find(ct => ct.id === c.centreId)?.name || c.centreId)}</td>
                     <td>{new Date(c.date).toLocaleDateString('fr-FR')}</td>
                     <td>{c.reason || '-'}</td>
                     <td>

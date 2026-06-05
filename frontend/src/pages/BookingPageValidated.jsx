@@ -10,7 +10,6 @@ import { Alert } from '../ui/Alert';
 import { FormField } from '../ui/FormField';
 import { validateForm } from '../utils/validation';
 
-// ── Popup de confirmation ────────────────────────────────────────────────────
 function ConfirmModal({ onConfirm, onCancel }) {
   return (
     <div style={{
@@ -32,26 +31,16 @@ function ConfirmModal({ onConfirm, onCancel }) {
           Êtes-vous certain(e) de vouloir prendre ce rendez-vous ?
         </p>
         <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-          <button
-            onClick={onConfirm}
-            style={{
-              flex: 1, padding: '10px 0', borderRadius: '8px',
-              background: '#3b82f6', color: 'white', border: 'none',
-              fontWeight: '600', fontSize: '15px', cursor: 'pointer',
-            }}
-          >
-            Oui
-          </button>
-          <button
-            onClick={onCancel}
-            style={{
-              flex: 1, padding: '10px 0', borderRadius: '8px',
-              background: '#f1f5f9', color: '#334155', border: '1px solid #e2e8f0',
-              fontWeight: '600', fontSize: '15px', cursor: 'pointer',
-            }}
-          >
-            Non
-          </button>
+          <button onClick={onConfirm} style={{
+            flex: 1, padding: '10px 0', borderRadius: '8px',
+            background: '#3b82f6', color: 'white', border: 'none',
+            fontWeight: '600', fontSize: '15px', cursor: 'pointer',
+          }}>Oui</button>
+          <button onClick={onCancel} style={{
+            flex: 1, padding: '10px 0', borderRadius: '8px',
+            background: '#f1f5f9', color: '#334155', border: '1px solid #e2e8f0',
+            fontWeight: '600', fontSize: '15px', cursor: 'pointer',
+          }}>Non</button>
         </div>
       </div>
     </div>
@@ -64,7 +53,6 @@ export default function BookingPageValidated() {
   const [result, setResult] = useState(null);
   const [showAlert, setShowAlert] = useState(null);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [pendingSubmit, setPendingSubmit] = useState(null);
 
   const { data: centres, loading: centresLoading, error: centresError } = useAPI(
     () => api.getCentres(),
@@ -74,7 +62,8 @@ export default function BookingPageValidated() {
   const {
     formData, setFormData, errors, touched,
     isSubmitting, handleChange, handleBlur,
-    handleSubmit: originalHandleSubmit, reset
+    handleSubmit: originalHandleSubmit,
+    validateOnly, reset
   } = useForm(
     { centreId: '', nom: '', prenom: '', phone: '', email: '', date: '', chrono: '', immatriculation: '', vin: '' },
     async (data) => {
@@ -104,66 +93,34 @@ export default function BookingPageValidated() {
     }
   };
 
-  // Intercepter la soumission pour afficher le popup
-  const handleSubmit = async (e) => {
+  // Étape 1 : valider le formulaire → afficher le popup si valide
+  const handleSubmit = (e) => {
     e.preventDefault();
-    // Valider d'abord le formulaire via originalHandleSubmit
-    // On stocke l'event et on affiche le popup seulement si le formulaire est valide
-    const fakeE = { preventDefault: () => {} };
-    // Déclencher la validation sans soumettre
-    await originalHandleSubmit({
-      ...fakeE,
-      _dryRun: true,
-      preventDefault: () => {},
-    });
-
-    // Vérifier les erreurs de validation manuellement
-    const isPIMO = selectedCentre?.type === 'PIMO';
-    const hasErrors =
-      !formData.nom?.trim() || !formData.prenom?.trim() || !formData.phone?.trim() ||
-      !formData.centreId || !formData.date ||
-      (isPIMO && (!formData.chrono?.trim() || !formData.vin?.trim() || !formData.immatriculation?.trim()));
-
-    if (hasErrors) {
-      await originalHandleSubmit(e);
-      return;
-    }
-
-    // Formulaire valide → afficher le popup
-    setPendingSubmit(e);
-    setShowConfirm(true);
+    const isValid = validateOnly();
+    if (isValid) setShowConfirm(true);
   };
 
+  // Étape 2 : l'usager clique "Oui" → soumettre réellement (enregistrement + PDF)
   const handleConfirmYes = async () => {
     setShowConfirm(false);
-    if (pendingSubmit) await originalHandleSubmit(pendingSubmit);
-    setPendingSubmit(null);
+    await originalHandleSubmit({ preventDefault: () => {} });
   };
 
-  const handleConfirmNo = () => {
-    setShowConfirm(false);
-    setPendingSubmit(null);
-  };
+  // L'usager clique "Non" → fermer le popup, rien d'autre
+  const handleConfirmNo = () => setShowConfirm(false);
 
-  if (centresLoading) {
-    return <Card><div className="loading">Chargement des centres...</div></Card>;
-  }
-
-  if (centresError) {
-    return (
-      <Alert type="error" onClose={() => window.location.reload()}>
-        Impossible de charger les centres : {centresError.message}
-      </Alert>
-    );
-  }
+  if (centresLoading) return <Card><div className="loading">Chargement des centres...</div></Card>;
+  if (centresError) return (
+    <Alert type="error" onClose={() => window.location.reload()}>
+      Impossible de charger les centres : {centresError.message}
+    </Alert>
+  );
 
   const isPIMO = selectedCentre?.type === 'PIMO';
 
   return (
     <>
-      {showConfirm && (
-        <ConfirmModal onConfirm={handleConfirmYes} onCancel={handleConfirmNo} />
-      )}
+      {showConfirm && <ConfirmModal onConfirm={handleConfirmYes} onCancel={handleConfirmNo} />}
 
       {showAlert && (
         <Alert type={showAlert.type} onClose={() => setShowAlert(null)}>
@@ -194,7 +151,7 @@ export default function BookingPageValidated() {
               </tbody>
             </table>
             <p style={{ marginTop: '20px', color: '#475569', fontSize: '14px' }}>
-              Le PDF de confirmation est ouvert dans un nouvel onglet. Vous pouvez l'imprimer ou le télécharger.
+              Le PDF de confirmation est ouvert dans un nouvel onglet.
             </p>
           </CardBody>
           <CardFooter>
@@ -205,29 +162,21 @@ export default function BookingPageValidated() {
         </Card>
       ) : (
         <Card>
-          <CardHeader>
-            <h2>📝 Prendre un Rendez-vous</h2>
-          </CardHeader>
+          <CardHeader><h2>📝 Prendre un Rendez-vous</h2></CardHeader>
           <CardBody>
             <form onSubmit={handleSubmit}>
               <div className="grid-2">
                 <FormField label="Nom" name="nom" value={formData.nom} onChange={handleChange} onBlur={handleBlur} error={errors.nom} touched={touched.nom} required placeholder="DUPONT" />
                 <FormField label="Prénom" name="prenom" value={formData.prenom} onChange={handleChange} onBlur={handleBlur} error={errors.prenom} touched={touched.prenom} required placeholder="JEAN" />
               </div>
-
               <div className="grid-2">
                 <FormField label="Téléphone (10 chiffres)" name="phone" type="tel" value={formData.phone} onChange={handleChange} onBlur={handleBlur} error={errors.phone} touched={touched.phone} required placeholder="0601020304" maxLength={10} />
                 <FormField label="Email" name="email" type="email" value={formData.email} onChange={handleChange} onBlur={handleBlur} error={errors.email} touched={touched.email} placeholder="jean@example.com" />
               </div>
 
               <FormField label="Centre *" name="centreId">
-                <select
-                  name="centreId"
-                  value={formData.centreId}
-                  onChange={handleCentreChange}
-                  onBlur={handleBlur}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: errors.centreId && touched.centreId ? '2px solid #ef4444' : '1px solid #e2e8f0', fontSize: '14px' }}
-                >
+                <select name="centreId" value={formData.centreId} onChange={handleCentreChange} onBlur={handleBlur}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: errors.centreId && touched.centreId ? '2px solid #ef4444' : '1px solid #e2e8f0', fontSize: '14px' }}>
                   <option value="">-- Sélectionner un centre --</option>
                   {centres?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
@@ -262,8 +211,7 @@ export default function BookingPageValidated() {
               )}
 
               <Button
-                variant="primary"
-                type="submit"
+                variant="primary" type="submit"
                 disabled={
                   !formData.centreId || !formData.date || !formData.nom ||
                   !formData.prenom || !formData.phone ||

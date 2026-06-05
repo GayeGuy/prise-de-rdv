@@ -50,6 +50,15 @@ export function useForm(initialValues, onSubmit, validate) {
     setIsSubmitting(false);
   }, [formData, validate, onSubmit]);
 
+  // Valide sans soumettre — retourne true si le formulaire est valide
+  const validateOnly = useCallback(() => {
+    const newErrors = validate ? validate(formData) : {};
+    setErrors(newErrors);
+    const allTouched = Object.keys(formData).reduce((acc, k) => ({ ...acc, [k]: true }), {});
+    setTouched(allTouched);
+    return Object.keys(newErrors).length === 0;
+  }, [formData, validate]);
+
   const reset = useCallback(() => {
     setFormData(initialValues);
     setErrors({});
@@ -65,6 +74,7 @@ export function useForm(initialValues, onSubmit, validate) {
     handleChange,
     handleBlur,
     handleSubmit,
+    validateOnly,
     reset
   };
 }

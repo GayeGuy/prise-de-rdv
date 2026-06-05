@@ -136,10 +136,10 @@ export function generatePDF(appointment, centre) {
   <div class="card-full">
     <div class="card-header"><i class="fa-solid fa-file-lines"></i><span class="card-title">Documents à présenter</span></div>
     <div class="docs-list">
-      <div class="doc-item"><i class="fa-solid fa-square-check"></i> Carte Nationale d'Identité</div>
-      <div class="doc-item"><i class="fa-solid fa-square-check"></i> Carte grise ou attestation</div>
-      <div class="doc-item"><i class="fa-solid fa-square-check"></i> Reçu de paiement</div>
-      <div class="doc-item"><i class="fa-solid fa-square-check"></i> Présence physique du véhicule (si requis)</div>
+      <div class="doc-item"><i class="fa-solid fa-square-check"></i> Pièce justificative d'identité</div>
+      <div class="doc-item"><i class="fa-solid fa-square-check"></i> Carte grise</div>
+      <div class="doc-item"><i class="fa-solid fa-square-check"></i> Fiche de rendez-vous</div>
+      <div class="doc-item"><i class="fa-solid fa-square-check"></i> Présence physique du véhicule</div>
     </div>
   </div>
   <div class="important-box">

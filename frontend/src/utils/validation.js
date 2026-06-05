@@ -15,7 +15,16 @@ export const formatters = {
   email:          (v) => v.toLowerCase().replace(/\s/g, ''),
   chrono:         (v) => v.toUpperCase().replace(/[^A-Z0-9]/g, ''),
   vin:            (v) => v.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 17),
-  immatriculation:(v) => v.toUpperCase().replace(/[^A-Z0-9\-]/g, ''),
+  immatriculation:(v) => {
+    // Nettoyer : majuscules, garder seulement lettres/chiffres/tirets
+    const clean = v.toUpperCase().replace(/[^A-Z0-9\-]/g, '');
+    // Insérer les tirets automatiquement : AA-NNN-XX
+    // Retirer les tirets existants pour reformater
+    const raw = clean.replace(/-/g, '');
+    if (raw.length <= 2) return raw;
+    if (raw.length <= 5) return raw.slice(0, 2) + '-' + raw.slice(2);
+    return raw.slice(0, 2) + '-' + raw.slice(2, 5) + '-' + raw.slice(5, 7);
+  },
   code:           (v) => v.toUpperCase().replace(/[^A-Z0-9\-_]/g, ''),
   username:       (v) => v.toLowerCase().replace(/[^a-z0-9.\-_]/g, ''),
   name:           (v) => v.replace(/[^A-ZÀ-ÖØ-Ýa-zà-öø-ý0-9\s\-'.,()]/gi, ''),

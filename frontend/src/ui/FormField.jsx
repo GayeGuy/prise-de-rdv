@@ -83,6 +83,12 @@ export function FormField({
           maxLength={maxLength}
           aria-invalid={hasError ? 'true' : 'false'}
           aria-describedby={hasError ? `${name}-error` : undefined}
+          autoCapitalize={
+            ['nom','prenom','chrono','vin','immatriculation','code'].includes(name) ? 'characters' : 'none'
+          }
+          autoCorrect="off"
+          autoComplete="off"
+          spellCheck="false"
           style={{
             width: '100%',
             padding: '8px 12px',

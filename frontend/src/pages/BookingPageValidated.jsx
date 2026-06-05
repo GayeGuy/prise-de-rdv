@@ -214,7 +214,8 @@ export default function BookingPageValidated() {
                 variant="primary" type="submit"
                 disabled={
                   !formData.centreId || !formData.date || !formData.nom ||
-                  !formData.prenom || !formData.phone ||
+                  !formData.prenom || !formData.phone
+ ||
                   (isPIMO && (!formData.vin || !formData.chrono || !formData.immatriculation)) ||
                   isSubmitting
                 }
@@ -230,3 +231,4 @@ export default function BookingPageValidated() {
     </>
   );
 }
+

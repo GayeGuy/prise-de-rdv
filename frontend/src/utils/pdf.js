@@ -3,372 +3,495 @@ export function generatePDF(appointment, centre) {
   const dateStr = new Date(appointment.date).toLocaleDateString('fr-FR', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
   });
+  // Capitaliser première lettre
+  const dateFormatted = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
 
   const now = new Date();
-  const generatedAt = `${now.toLocaleDateString('fr-FR')} à ${now.toLocaleTimeString('fr-FR')}`;
+  const generatedDate = now.toLocaleDateString('fr-FR');
+  const generatedTime = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
-  // QR code simple via API publique
-  const qrData = encodeURIComponent(`MonRDVPlaque|${appointment.reference}|${appointment.date}|${appointment.nom} ${appointment.prenom}`);
-  const qrUrl  = `https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${qrData}`;
+  const qrData = encodeURIComponent(`${appointment.reference}|${appointment.date}|${appointment.nom}|${appointment.prenom}`);
+  const qrUrl  = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&color=000000&bgcolor=ffffff&data=${qrData}`;
 
   const html = `<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MonRDVPlaque — ${appointment.reference}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-      background: #f0f4f8;
-      padding: 24px 16px;
-      color: #1e293b;
+      font-family: 'Inter', Arial, sans-serif;
+      background: #F8FAFC;
+      color: #374151;
+      padding: 20px;
     }
 
     .page {
       max-width: 680px;
       margin: 0 auto;
       background: white;
-      border-radius: 16px;
-      overflow: hidden;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+    }
+
+    /* ── Bandeau supérieur bleu ── */
+    .top-band {
+      background: #2563EB;
+      height: 6px;
+      border-radius: 4px 4px 0 0;
     }
 
     /* ── Header ── */
     .header {
-      padding: 20px 28px 18px;
-      border-bottom: 1px solid #e8edf2;
+      padding: 18px 24px 16px;
       display: flex;
       justify-content: space-between;
       align-items: center;
+      border-bottom: 1px solid #E5E7EB;
     }
 
-    .header-left { display: flex; align-items: center; gap: 14px; }
-
-    .logo-box {
-      width: 52px; height: 52px;
-      background: #eef4ff;
-      border: 2px solid #c7d9f8;
-      border-radius: 10px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 22px;
-    }
-
-    .brand-name {
-      font-size: 22px; font-weight: 700; color: #1e293b; line-height: 1;
-    }
-    .brand-name span { color: #3b82f6; }
-
-    .brand-sub { font-size: 12px; color: #64748b; margin-top: 3px; }
-
-    .header-icon {
-      width: 48px; height: 48px;
-      background: #dbeafe;
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 22px;
-    }
-
-    /* ── Title section ── */
-    .title-section {
-      padding: 24px 28px 20px;
-      border-bottom: 1px solid #e8edf2;
+    .header-left {
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 14px;
     }
 
-    .title-icon {
-      width: 48px; height: 48px;
-      background: #f1f5f9;
+    /* Logo EMUCI */
+    .logo {
+      width: 56px; height: 56px;
+      background: #EFF6FF;
+      border: 2px solid #BFDBFE;
       border-radius: 10px;
       display: flex; align-items: center; justify-content: center;
-      font-size: 24px;
       flex-shrink: 0;
     }
 
-    .title-section h1 { font-size: 24px; font-weight: 700; color: #0f172a; }
-    .title-section p  { font-size: 13px; color: #64748b; margin-top: 2px; }
+    .logo-inner {
+      text-align: center;
+      line-height: 1.1;
+    }
 
-    /* ── Reference box ── */
-    .reference-box {
-      margin: 20px 28px;
-      border: 1.5px solid #e2e8f0;
-      border-radius: 10px;
-      padding: 14px 18px;
+    .logo-icon { font-size: 20px; color: #2563EB; }
+    .logo-text { font-size: 7px; font-weight: 700; color: #1D4ED8; letter-spacing: 0.5px; margin-top: 2px; }
+
+    .header-titles { }
+    .app-name {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 20px; font-weight: 700; color: #111827; line-height: 1;
+    }
+    .app-name span { color: #2563EB; }
+
+    .app-sub  { font-size: 11px; color: #6B7280; margin-top: 2px; }
+    .app-sub2 { font-size: 10px; color: #9CA3AF; margin-top: 1px; }
+
+    .header-badge {
+      text-align: right;
+    }
+
+    .header-badge .badge-icon {
+      width: 44px; height: 44px;
+      background: #EFF6FF;
+      border: 1.5px solid #BFDBFE;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; color: #2563EB;
+      margin-left: auto;
+    }
+
+    /* ── Référence ── */
+    .ref-section {
+      margin: 16px 24px;
+      border: 1.5px solid #E5E7EB;
+      border-radius: 8px;
+      padding: 12px 16px;
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
 
-    .ref-label { font-size: 11px; font-weight: 700; color: #3b82f6; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 4px; }
-    .ref-value { font-size: 20px; font-weight: 800; color: #0f172a; font-family: 'Courier New', monospace; letter-spacing: 1px; }
-
-    .ref-shield {
-      width: 36px; height: 36px;
-      border: 2px solid #e2e8f0;
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 18px; color: #94a3b8;
+    .ref-label {
+      font-size: 9px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 1px;
+      color: #6B7280; margin-bottom: 4px;
     }
 
-    /* ── Sections ── */
-    .body { padding: 0 28px 24px; }
+    .ref-value {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 18px; font-weight: 700;
+      color: #111827; letter-spacing: 1.5px;
+    }
 
-    .section {
-      border: 1.5px solid #e2e8f0;
-      border-radius: 10px;
-      margin-bottom: 14px;
+    .ref-status {
+      display: flex; align-items: center; gap: 6px;
+      background: #F0FDF4;
+      border: 1.5px solid #BBF7D0;
+      border-radius: 20px;
+      padding: 5px 12px;
+      font-size: 11px; font-weight: 700;
+      color: #15803D;
+    }
+
+    .ref-status .dot {
+      width: 8px; height: 8px;
+      background: #22C55E;
+      border-radius: 50%;
+    }
+
+    /* ── Grille 2 colonnes Centre / Client ── */
+    .two-col {
+      margin: 0 24px 14px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    /* ── Cartes ── */
+    .card {
+      border: 1.5px solid #E5E7EB;
+      border-radius: 8px;
       overflow: hidden;
     }
 
-    .section-header {
-      padding: 10px 16px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      border-bottom: 1px solid #e8edf2;
-      background: #fafbfc;
+    .card-header {
+      background: #F9FAFB;
+      border-bottom: 1px solid #E5E7EB;
+      padding: 8px 12px;
+      display: flex; align-items: center; gap: 7px;
     }
 
-    .section-icon {
-      width: 30px; height: 30px;
-      background: #eef4ff;
-      border-radius: 6px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 15px;
+    .card-header i { font-size: 12px; color: #2563EB; width: 14px; text-align: center; }
+
+    .card-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.8px;
+      color: #374151;
     }
 
-    .section-header h2 {
-      font-size: 13px; font-weight: 700;
-      text-transform: uppercase; letter-spacing: 0.6px;
-      color: #334155;
-    }
+    .card-body { padding: 12px; }
 
-    .section-body {
-      padding: 14px 16px;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 14px 20px;
-    }
-
-    .section-body.single { grid-template-columns: 1fr; }
+    .field { margin-bottom: 8px; }
+    .field:last-child { margin-bottom: 0; }
 
     .field-label {
-      font-size: 10px; font-weight: 700;
-      text-transform: uppercase; letter-spacing: 0.6px;
-      color: #94a3b8; margin-bottom: 3px;
+      font-size: 9px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.7px;
+      color: #9CA3AF; margin-bottom: 2px;
     }
 
     .field-value {
-      font-size: 14px; font-weight: 500; color: #1e293b;
+      font-size: 12px; font-weight: 600; color: #111827;
     }
 
-    /* Statut badge */
-    .status-badge {
-      display: inline-flex; align-items: center; gap: 5px;
-      background: #dcfce7; color: #15803d;
-      padding: 4px 10px; border-radius: 6px;
-      font-size: 12px; font-weight: 700;
+    /* ── Carte pleine largeur ── */
+    .card-full {
+      margin: 0 24px 14px;
+      border: 1.5px solid #E5E7EB;
+      border-radius: 8px;
+      overflow: hidden;
     }
+
+    .detail-grid {
+      padding: 12px 16px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px 24px;
+    }
+
+    .detail-item {
+      display: flex; align-items: flex-start; gap: 8px;
+    }
+
+    .detail-item i {
+      font-size: 12px; color: #60A5FA;
+      margin-top: 2px; width: 14px; text-align: center;
+    }
+
+    .detail-item .d-label {
+      font-size: 9px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.7px;
+      color: #9CA3AF; margin-bottom: 2px;
+    }
+
+    .detail-item .d-value {
+      font-size: 12px; font-weight: 600; color: #111827;
+    }
+
+    /* ── Documents ── */
+    .docs-list { padding: 10px 16px; }
+
+    .doc-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 5px 0;
+      font-size: 12px; color: #374151;
+      border-bottom: 1px solid #F3F4F6;
+    }
+
+    .doc-item:last-child { border-bottom: none; }
+
+    .doc-item i { font-size: 11px; color: #2563EB; }
 
     /* ── Important ── */
-    .important {
-      background: #fffbeb;
-      border: 1.5px solid #fde68a;
-      border-radius: 10px;
-      padding: 14px 16px;
-      margin-bottom: 14px;
-      display: flex;
-      gap: 12px;
-      align-items: flex-start;
+    .important-box {
+      margin: 0 24px 14px;
+      border: 1.5px solid #FDE68A;
+      border-radius: 8px;
+      overflow: hidden;
     }
 
-    .important-icon {
-      width: 28px; height: 28px;
-      background: #f59e0b;
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 14px; flex-shrink: 0; color: white; font-weight: 700;
+    .important-header {
+      background: #FFFBEB;
+      border-bottom: 1px solid #FDE68A;
+      padding: 8px 12px;
+      display: flex; align-items: center; gap: 7px;
     }
 
-    .important h3 { font-size: 12px; font-weight: 700; color: #d97706; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 5px; }
-    .important p  { font-size: 12px; color: #78350f; line-height: 1.6; }
+    .important-header i { font-size: 12px; color: #F59E0B; }
+
+    .important-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.8px;
+      color: #92400E;
+    }
+
+    .important-body { padding: 10px 14px; }
+
+    .important-body p {
+      font-size: 11px; color: #78350F; line-height: 1.7; margin-bottom: 4px;
+    }
+
+    .important-body p:last-child { margin-bottom: 0; }
 
     /* ── Footer ── */
     .footer {
-      padding: 14px 28px;
-      border-top: 1px solid #e8edf2;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+      margin: 0 24px 20px;
+      border: 1.5px solid #E5E7EB;
+      border-radius: 8px;
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: auto 1fr;
     }
 
-    .footer-left { display: flex; align-items: center; gap: 8px; }
-    .footer-icon { font-size: 18px; color: #94a3b8; }
-    .footer-text { font-size: 11px; color: #64748b; line-height: 1.5; }
+    .footer-qr {
+      padding: 14px;
+      border-right: 1px solid #E5E7EB;
+      display: flex; flex-direction: column;
+      align-items: center; gap: 6px;
+    }
+
+    .qr-label {
+      font-size: 8px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.8px;
+      color: #6B7280; text-align: center;
+    }
+
+    .footer-info {
+      padding: 14px 16px;
+      display: flex; flex-direction: column; justify-content: center;
+      gap: 6px;
+    }
+
+    .footer-row {
+      font-size: 11px; color: #374151;
+      display: flex; align-items: center; gap: 6px;
+    }
+
+    .footer-row i { font-size: 11px; color: #60A5FA; width: 14px; }
+
+    .footer-copy {
+      margin-top: 6px;
+      padding-top: 6px;
+      border-top: 1px solid #F3F4F6;
+      font-size: 10px; color: #9CA3AF;
+    }
+
+    /* ── Bandeau bas ── */
+    .bottom-band {
+      background: #2563EB;
+      height: 4px;
+      border-radius: 0 0 4px 4px;
+    }
 
     @media print {
       body { background: white; padding: 0; }
-      .page { box-shadow: none; border-radius: 0; }
+      .page { box-shadow: none; }
     }
   </style>
 </head>
 <body>
-  <div class="page">
+<div class="page">
 
-    <!-- Header -->
-    <div class="header">
-      <div class="header-left">
-        <div class="logo-box">🏢</div>
-        <div>
-          <div class="brand-name">Mon<span>RDV</span>Plaque</div>
-          <div class="brand-sub">Votre rendez-vous en toute simplicité</div>
+  <div class="top-band"></div>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <div class="logo">
+        <div class="logo-inner">
+          <div class="logo-icon"><i class="fa-solid fa-layer-group"></i></div>
+          <div class="logo-text">EMU-CI</div>
         </div>
       </div>
-      <div class="header-icon">📅</div>
-    </div>
-
-    <!-- Title -->
-    <div class="title-section">
-      <div class="title-icon">📋</div>
-      <div>
-        <h1>Confirmation de Rendez-vous</h1>
-        <p>Plaques d'immatriculation</p>
+      <div class="header-titles">
+        <div class="app-name">Mon<span>RDV</span>Plaque</div>
+        <div class="app-sub">Confirmation de Rendez-vous</div>
+        <div class="app-sub2">Plaques d'immatriculation</div>
       </div>
     </div>
-
-    <!-- Référence -->
-    <div class="reference-box">
-      <div>
-        <div class="ref-label">Numéro de référence</div>
-        <div class="ref-value">${appointment.reference}</div>
-      </div>
-      <div class="ref-shield">🛡</div>
+    <div class="header-badge">
+      <div class="badge-icon"><i class="fa-regular fa-calendar-check"></i></div>
     </div>
-
-    <!-- Corps -->
-    <div class="body">
-
-      <!-- Centre -->
-      <div class="section">
-        <div class="section-header">
-          <div class="section-icon">🏛</div>
-          <h2>Centre</h2>
-        </div>
-        <div class="section-body">
-          <div>
-            <div class="field-label">Nom du centre</div>
-            <div class="field-value">${centre?.name || '—'}</div>
-          </div>
-          <div>
-            <div class="field-label">Type de service</div>
-            <div class="field-value">Pose de plaques</div>
-          </div>
-          <div>
-            <div class="field-label">Région</div>
-            <div class="field-value">${centre?.region || '—'}</div>
-          </div>
-          <div>
-            <div class="field-label">Adresse</div>
-            <div class="field-value">${centre?.address || '—'}</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Informations personnelles -->
-      <div class="section">
-        <div class="section-header">
-          <div class="section-icon">👤</div>
-          <h2>Informations personnelles</h2>
-        </div>
-        <div class="section-body">
-          <div>
-            <div class="field-label">Prénom</div>
-            <div class="field-value">${appointment.prenom}</div>
-          </div>
-          <div>
-            <div class="field-label">Nom</div>
-            <div class="field-value">${appointment.nom}</div>
-          </div>
-          <div>
-            <div class="field-label">Téléphone</div>
-            <div class="field-value">${appointment.phone}</div>
-          </div>
-          <div>
-            <div class="field-label">Email</div>
-            <div class="field-value">${appointment.email || 'Non fourni'}</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Détails RDV -->
-      <div class="section">
-        <div class="section-header">
-          <div class="section-icon">📆</div>
-          <h2>Détails du rendez-vous</h2>
-        </div>
-        <div class="section-body">
-          <div>
-            <div class="field-label">📅 Date</div>
-            <div class="field-value">${dateStr}</div>
-          </div>
-          <div>
-            <div class="field-label">Statut</div>
-            <div class="field-value">
-              <span class="status-badge">✅ Réservé</span>
-            </div>
-          </div>
-          ${appointment.chrono ? `
-          <div>
-            <div class="field-label">Numéro Chrono</div>
-            <div class="field-value">${appointment.chrono}</div>
-          </div>` : ''}
-          ${appointment.vin ? `
-          <div>
-            <div class="field-label">VIN</div>
-            <div class="field-value">${appointment.vin}</div>
-          </div>` : ''}
-          ${appointment.immatriculation ? `
-          <div>
-            <div class="field-label">🔢 Immatriculation</div>
-            <div class="field-value">${appointment.immatriculation}</div>
-          </div>` : ''}
-        </div>
-      </div>
-
-      <!-- Important -->
-      <div class="important">
-        <div class="important-icon">!</div>
-        <div>
-          <h3>Important</h3>
-          <p>Veuillez arriver 15 minutes avant l'heure de votre rendez-vous avec les documents requis.
-          En cas d'empêchement, annulez votre rendez-vous au moins 24 heures à l'avance en utilisant
-          votre numéro de référence.</p>
-        </div>
-      </div>
-
-    </div><!-- /body -->
-
-    <!-- Footer -->
-    <div class="footer">
-      <div class="footer-left">
-        <div class="footer-icon">✅</div>
-        <div class="footer-text">
-          <div>Généré le ${generatedAt}</div>
-          <div>Conservez ce document. Vous en aurez besoin le jour de votre rendez-vous.</div>
-        </div>
-      </div>
-      <img src="${qrUrl}" width="80" height="80" alt="QR Code" style="border-radius:6px;" />
-    </div>
-
   </div>
 
-  <script>
-    document.title = 'MonRDVPlaque — ${appointment.reference}';
-  </script>
+  <!-- Référence -->
+  <div class="ref-section">
+    <div>
+      <div class="ref-label">Référence du rendez-vous</div>
+      <div class="ref-value">${appointment.reference}</div>
+    </div>
+    <div class="ref-status">
+      <div class="dot"></div>
+      RÉSERVÉ
+    </div>
+  </div>
+
+  <!-- Centre + Client -->
+  <div class="two-col">
+    <div class="card">
+      <div class="card-header">
+        <i class="fa-solid fa-building"></i>
+        <span class="card-title">Centre</span>
+      </div>
+      <div class="card-body">
+        <div class="field">
+          <div class="field-value" style="font-size:13px;">${centre?.name || '—'}</div>
+        </div>
+        <div class="field">
+          <div class="field-label">Région</div>
+          <div class="field-value">${centre?.region || '—'}</div>
+        </div>
+        <div class="field">
+          <div class="field-label">Adresse</div>
+          <div class="field-value">${centre?.address || '—'}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <i class="fa-solid fa-user"></i>
+        <span class="card-title">Informations client</span>
+      </div>
+      <div class="card-body">
+        <div class="field">
+          <div class="field-label">Nom</div>
+          <div class="field-value">${appointment.nom} ${appointment.prenom}</div>
+        </div>
+        <div class="field">
+          <div class="field-label">Téléphone</div>
+          <div class="field-value">${appointment.phone}</div>
+        </div>
+        <div class="field">
+          <div class="field-label">Email</div>
+          <div class="field-value">${appointment.email || 'Non fourni'}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Détails RDV -->
+  <div class="card-full">
+    <div class="card-header">
+      <i class="fa-solid fa-calendar-days"></i>
+      <span class="card-title">Détails du rendez-vous</span>
+    </div>
+    <div class="detail-grid">
+      <div class="detail-item">
+        <i class="fa-regular fa-calendar"></i>
+        <div>
+          <div class="d-label">Date du rendez-vous</div>
+          <div class="d-value">${dateFormatted}</div>
+        </div>
+      </div>
+      ${appointment.chrono ? `
+      <div class="detail-item">
+        <i class="fa-solid fa-bookmark"></i>
+        <div>
+          <div class="d-label">Numéro Chrono</div>
+          <div class="d-value">${appointment.chrono}</div>
+        </div>
+      </div>` : ''}
+      ${appointment.vin ? `
+      <div class="detail-item">
+        <i class="fa-solid fa-car"></i>
+        <div>
+          <div class="d-label">VIN</div>
+          <div class="d-value">${appointment.vin}</div>
+        </div>
+      </div>` : ''}
+      ${appointment.immatriculation ? `
+      <div class="detail-item">
+        <i class="fa-solid fa-hashtag"></i>
+        <div>
+          <div class="d-label">Immatriculation</div>
+          <div class="d-value">${appointment.immatriculation}</div>
+        </div>
+      </div>` : ''}
+    </div>
+  </div>
+
+  <!-- Documents à présenter -->
+  <div class="card-full">
+    <div class="card-header">
+      <i class="fa-solid fa-file-lines"></i>
+      <span class="card-title">Documents à présenter</span>
+    </div>
+    <div class="docs-list">
+      <div class="doc-item"><i class="fa-solid fa-square-check"></i> Carte Nationale d'Identité</div>
+      <div class="doc-item"><i class="fa-solid fa-square-check"></i> Carte grise ou attestation</div>
+      <div class="doc-item"><i class="fa-solid fa-square-check"></i> Reçu de paiement</div>
+      <div class="doc-item"><i class="fa-solid fa-square-check"></i> Présence physique du véhicule (si requis)</div>
+    </div>
+  </div>
+
+  <!-- Important -->
+  <div class="important-box">
+    <div class="important-header">
+      <i class="fa-solid fa-triangle-exclamation"></i>
+      <span class="important-title">Important</span>
+    </div>
+    <div class="important-body">
+      <p>Veuillez vous présenter <strong>15 minutes avant</strong> l'heure prévue avec les documents requis.</p>
+      <p>En cas d'empêchement, merci d'annuler votre rendez-vous au moins <strong>24 heures à l'avance</strong> en utilisant votre numéro de référence.</p>
+    </div>
+  </div>
+
+  <!-- Footer QR + infos -->
+  <div class="footer">
+    <div class="footer-qr">
+      <div class="qr-label">QR Code de contrôle</div>
+      <img src="${qrUrl}" width="90" height="90" alt="QR Code" />
+    </div>
+    <div class="footer-info">
+      <div class="footer-row"><i class="fa-regular fa-clock"></i> Généré le : ${generatedDate} à ${generatedTime}</div>
+      <div class="footer-row"><i class="fa-solid fa-shield-halved"></i> ${appointment.reference}</div>
+      <div class="footer-copy">
+        MonRDVPlaque © ${new Date().getFullYear()} &nbsp;·&nbsp; Solution EMUCI<br>
+        Conservez ce document. Vous en aurez besoin le jour de votre rendez-vous.
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-band"></div>
+
+</div>
+<script>
+  document.title = 'MonRDVPlaque — ${appointment.reference}';
+</script>
 </body>
 </html>`;
 

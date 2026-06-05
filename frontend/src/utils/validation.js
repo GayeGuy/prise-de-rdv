@@ -16,14 +16,24 @@ export const formatters = {
   chrono:         (v) => v.toUpperCase().replace(/[^A-Z0-9]/g, ''),
   vin:            (v) => v.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 17),
   immatriculation:(v) => {
-    // Nettoyer : majuscules, garder seulement lettres/chiffres/tirets
-    const clean = v.toUpperCase().replace(/[^A-Z0-9\-]/g, '');
-    // Insérer les tirets automatiquement : AA-NNN-XX
-    // Retirer les tirets existants pour reformater
-    const raw = clean.replace(/-/g, '');
-    if (raw.length <= 2) return raw;
-    if (raw.length <= 5) return raw.slice(0, 2) + '-' + raw.slice(2);
-    return raw.slice(0, 2) + '-' + raw.slice(2, 5) + '-' + raw.slice(5, 7);
+    // Extraire uniquement lettres et chiffres en majuscules
+    const clean = v.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    // Segmenter : 2 lettres | 3 chiffres | 2 lettres
+    let part1 = '', part2 = '', part3 = '';
+    let letters1 = 0, digits = 0, letters2 = 0;
+    for (const c of clean) {
+      const isLetter = /[A-Z]/.test(c);
+      const isDigit = /[0-9]/.test(c);
+      if (letters1 < 2 && isLetter) { part1 += c; letters1++; }
+      else if (letters1 === 2 && digits < 3 && isDigit) { part2 += c; digits++; }
+      else if (digits === 3 && letters2 < 2 && isLetter) { part3 += c; letters2++; }
+    }
+    // Assembler avec tirets uniquement si la partie précédente est complète
+    let result = part1;
+    if (part1.length === 2 && part2.length > 0) result += '-' + part2;
+    else if (part1.length === 2) result += (part2 ? '-' + part2 : '');
+    if (part2.length === 3 && part3.length > 0) result += '-' + part3;
+    return result;
   },
   code:           (v) => v.toUpperCase().replace(/[^A-Z0-9\-_]/g, ''),
   username:       (v) => v.toLowerCase().replace(/[^a-z0-9.\-_]/g, ''),

@@ -9,7 +9,7 @@ export default function PublicLayout({ onLogin, navigateTo }) {
     <>
       <nav>
         <div className="container">
-          <h1>🗓️ Plaques d'immatriculation</h1>
+          <h1>🗓️ MonRDVPlaque</h1>
           <div className="nav-right">
             <button 
               onClick={() => setPage('booking')}

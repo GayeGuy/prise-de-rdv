@@ -34,7 +34,7 @@ export function generatePDF(appointment, centre) {
       <div class="container">
         <div class="header">
           <h1>📋 Confirmation de Rendez-vous</h1>
-          <p>Plaques d'immatriculation</p>
+          <p>MonRDVPlaque</p>
         </div>
 
         <div class="reference">

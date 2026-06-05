@@ -23,7 +23,7 @@ export default function PrivateLayout({ user, onLogout }) {
     <>
       <nav>
         <div className="container">
-          <h1>🗓️ Gestion - Plaques</h1>
+          <h1>🗓️ MonRDVPlaque</h1>
           <div className="nav-right">
             <div className="user-info">
               {icons[user.role]} · {user.name || user.username}

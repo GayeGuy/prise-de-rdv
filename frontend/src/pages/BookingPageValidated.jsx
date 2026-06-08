@@ -145,12 +145,33 @@ export default function BookingPageValidated() {
   // L'usager clique "Non" → fermer le popup, rien d'autre
   const handleConfirmNo = () => setShowConfirm(false);
 
-  if (centresLoading) return <Card><div className="loading">Chargement des centres...</div></Card>;
-  if (centresError) return (
-    <Alert type="error" onClose={() => window.location.reload()}>
-      Impossible de charger les centres : {centresError.message}
-    </Alert>
-  );
+  if (centresLoading) {
+    return (
+      <Card>
+        <div className="loading">
+          <div style={{ fontSize: '32px', marginBottom: '12px' }}>⏳</div>
+          <div>Chargement en cours...</div>
+          <div style={{ fontSize: '13px', color: '#94a3b8', marginTop: '8px' }}>
+            Le serveur peut prendre jusqu'à 60 secondes à démarrer.
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
+  if (centresError) {
+    return (
+      <Card>
+        <div style={{ textAlign: 'center', padding: '24px' }}>
+          <div style={{ fontSize: '32px', marginBottom: '12px' }}>🔄</div>
+          <p style={{ color: '#ef4444', marginBottom: '12px' }}>{centresError.message}</p>
+          <button onClick={() => window.location.reload()} style={{ padding: '10px 24px' }}>
+            Réessayer
+          </button>
+        </div>
+      </Card>
+    );
+  }
 
   const isPIMO = selectedCentre?.type === 'PIMO';
 

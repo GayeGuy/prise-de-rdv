@@ -1,4 +1,7 @@
-const API_URL = 'http://localhost:3001/api';
+const API_URL = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : 'http://localhost:3001/api';
+
+// Délai utilitaire
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 export const api = {
   getToken() {
@@ -13,10 +16,11 @@ export const api = {
     localStorage.removeItem('token');
   },
 
-  async request(method, endpoint, body = null) {
+  async request(method, endpoint, body = null, retries = 3) {
     const options = {
       method,
       headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(60000),
     };
 
     const token = this.getToken();
@@ -28,6 +32,7 @@ export const api = {
       options.body = JSON.stringify(body);
     }
 
+    for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const response = await fetch(`${API_URL}${endpoint}`, options);
       
@@ -63,9 +68,18 @@ export const api = {
       
       return response.text();
     } catch (err) {
+      const isNetwork = err.name === 'TypeError' || err.name === 'AbortError' || err.message === 'Failed to fetch';
+      if (isNetwork && attempt < retries) {
+        await sleep(attempt * 3000);
+        continue;
+      }
+      if (isNetwork) {
+        throw new Error('Le serveur démarre, veuillez patienter quelques secondes et réessayer.');
+      }
       console.error('❌ API Error:', err);
       throw err;
     }
+    } // end for
   },
 
   // Auth

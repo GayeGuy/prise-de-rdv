@@ -493,6 +493,42 @@ app.get('/api/admin/centres/:centreId/exceptions', authMiddleware, (req, res) =>
 });
 
 // Start server
+// ── Base véhicules ────────────────────────────────────────────────────────
+
+// Lookup public (utilisé par le formulaire de RDV)
+app.get('/api/vehicles/lookup', (req, res) => {
+  const { immatriculation } = req.query;
+  if (!immatriculation) return res.status(400).json({ error: 'immatriculation requis' });
+  const vehicle = store.lookupVehicle(immatriculation);
+  if (!vehicle) return res.status(404).json({ error: 'Véhicule non trouvé' });
+  res.json(vehicle);
+});
+
+// Import CSV (admin uniquement)
+app.post('/api/admin/vehicles/import', authMiddleware, (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
+  const { rows } = req.body;
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return res.status(400).json({ error: 'Données invalides' });
+  }
+  const result = store.importVehicles(rows);
+  res.json(result);
+});
+
+// Liste véhicules (admin)
+app.get('/api/admin/vehicles', authMiddleware, (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
+  const vehicles = store.getVehicles();
+  res.json(vehicles);
+});
+
+// Supprimer tous les véhicules (admin)
+app.delete('/api/admin/vehicles', authMiddleware, (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
+  store.deleteAllVehicles();
+  res.json({ success: true });
+});
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);

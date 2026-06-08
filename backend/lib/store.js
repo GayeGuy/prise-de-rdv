@@ -453,4 +453,48 @@ class Store {
   }
 }
 
+  // ── Base véhicules (import CSV) ───────────────────────────────────────────
+
+  getVehicles() {
+    if (!this.data.vehicles) this.data.vehicles = [];
+    return this.data.vehicles;
+  }
+
+  lookupVehicle(immatriculation) {
+    if (!this.data.vehicles) return null;
+    const key = immatriculation.toUpperCase().replace(/\s/g, '');
+    return this.data.vehicles.find(v =>
+      v.immatriculation.toUpperCase().replace(/\s/g, '') === key
+    ) || null;
+  }
+
+  importVehicles(rows) {
+    // rows = [{ chrono, chassis, immatriculation }]
+    if (!this.data.vehicles) this.data.vehicles = [];
+    let added = 0, updated = 0, errors = 0;
+    for (const row of rows) {
+      const immat = (row.immatriculation || '').trim().toUpperCase();
+      const chassis = (row.chassis || '').trim().toUpperCase();
+      const chrono = (row.chrono || '').trim().toUpperCase();
+      if (!immat && !chassis) { errors++; continue; }
+      const existing = this.data.vehicles.find(v => v.immatriculation === immat);
+      if (existing) {
+        existing.chassis = chassis;
+        existing.chrono  = chrono;
+        updated++;
+      } else {
+        this.data.vehicles.push({ id: generateId(), immatriculation: immat, chassis, chrono });
+        added++;
+      }
+    }
+    this.save();
+    return { added, updated, errors, total: rows.length };
+  }
+
+  deleteAllVehicles() {
+    this.data.vehicles = [];
+    this.save();
+  }
+}
+
 export default new Store();

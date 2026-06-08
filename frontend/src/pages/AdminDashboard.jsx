@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { makeObjectFieldHandler } from '../utils/validation';
 import { api } from '../api';
 import { HolidaysManagerSimple } from '../components/HolidaysManagerSimple';
+import { VehiclesImportTab } from '../components/VehiclesImportTab';
 
 const DAYS_FR = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 const DAYS_FULL = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
@@ -316,6 +317,7 @@ export default function AdminDashboard() {
         <button className={tab === 'capacity' ? 'active' : ''} onClick={() => setTab('capacity')}>⚙️ Capacités</button>
         <button className={tab === 'closures' ? 'active' : ''} onClick={() => setTab('closures')}>📅 Fermetures</button>
         <button className={tab === 'holidays' ? 'active' : ''} onClick={() => setTab('holidays')}>🎉 Jours fériés</button>
+        <button className={tab === 'vehicles' ? 'active' : ''} onClick={() => setTab('vehicles')}>🚗 Base véhicules</button>
         <button className={tab === 'stats' ? 'active' : ''} onClick={() => setTab('stats')}>📊 Stats</button>
       </div>
 
@@ -878,6 +880,10 @@ export default function AdminDashboard() {
       )}
 
       {/* Stats */}
+      {tab === 'vehicles' && (
+        <VehiclesImportTab />
+      )}
+
       {tab === 'stats' && stats && (
         <div className="card">
           <h3>📊 Statistiques globales</h3>

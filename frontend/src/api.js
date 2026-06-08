@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : 'http://localhost:3001/api';
+const API_URL = 'http://localhost:3001/api';
 
 export const api = {
   getToken() {
@@ -229,5 +229,22 @@ export const api = {
     link.href = `data:text/csv;charset=utf-8,${encodeURIComponent(csv)}`;
     link.download = `export_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
+  },
+
+  // ── Base véhicules ────────────────────────────────────────────────────────
+  async lookupVehicle(immatriculation) {
+    return this.request('GET', `/vehicles/lookup?immatriculation=${encodeURIComponent(immatriculation)}`);
+  },
+
+  async importVehicles(rows) {
+    return this.request('POST', '/admin/vehicles/import', { rows });
+  },
+
+  async getVehicles() {
+    return this.request('GET', '/admin/vehicles');
+  },
+
+  async deleteAllVehicles() {
+    return this.request('DELETE', '/admin/vehicles');
   },
 };

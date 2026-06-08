@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { api } from '../api';
 import { generatePDF } from '../utils/pdf';
 import DatePicker from '../components/DatePicker';
@@ -53,6 +53,7 @@ export default function BookingPageValidated() {
   const [result, setResult] = useState(null);
   const [showAlert, setShowAlert] = useState(null);
   const [showConfirm, setShowConfirm] = useState(false);
+  const confirmingRef = useRef(false);
 
   const { data: centres, loading: centresLoading, error: centresError } = useAPI(
     () => api.getCentres(),
@@ -62,8 +63,7 @@ export default function BookingPageValidated() {
   const {
     formData, setFormData, errors, touched,
     isSubmitting, handleChange, handleBlur,
-    handleSubmit: originalHandleSubmit,
-    validateOnly, reset
+    validateOnly, submitNow, reset
   } = useForm(
     { centreId: '', nom: '', prenom: '', phone: '', email: '', date: '', chrono: '', immatriculation: '', vin: '' },
     async (data) => {
@@ -79,6 +79,39 @@ export default function BookingPageValidated() {
     },
     validateForm
   );
+
+  const [vehicleLookup, setVehicleLookup] = useState({ loading: false, found: false, notFound: false });
+
+  // Handler spécial immatriculation : formate + déclenche lookup
+  const handleImmatriculationChange = async (e) => {
+    handleChange(e); // formatage normal
+    const val = e.target.value;
+    const formatted = val.toUpperCase().replace(/[^A-Z0-9\-]/g, '');
+
+    // Reset les champs auto-remplis si l'immatriculation change
+    setFormData(prev => ({ ...prev, chrono: '', vin: '' }));
+    setVehicleLookup({ loading: false, found: false, notFound: false });
+
+    // Déclencher le lookup seulement si l'immat semble complète (≥ 6 chars)
+    if (formatted.replace(/-/g, '').length >= 6) {
+      setVehicleLookup({ loading: true, found: false, notFound: false });
+      try {
+        const vehicle = await api.lookupVehicle(formatted);
+        if (vehicle) {
+          // PIMO : remplir chrono + chassis (vin)
+          // POST_REIMMAT : remplir chassis (vin) uniquement
+          setFormData(prev => ({
+            ...prev,
+            vin: vehicle.chassis || '',
+            chrono: isPIMO ? (vehicle.chrono || '') : prev.chrono,
+          }));
+          setVehicleLookup({ loading: false, found: true, notFound: false });
+        }
+      } catch {
+        setVehicleLookup({ loading: false, found: false, notFound: true });
+      }
+    }
+  };
 
   const handleCentreChange = (e) => {
     const centreId = e.target.value;
@@ -102,8 +135,11 @@ export default function BookingPageValidated() {
 
   // Étape 2 : l'usager clique "Oui" → soumettre réellement (enregistrement + PDF)
   const handleConfirmYes = async () => {
+    if (confirmingRef.current) return;  // bloquer double appel
+    confirmingRef.current = true;
     setShowConfirm(false);
-    await originalHandleSubmit({ preventDefault: () => {} });
+    await submitNow();
+    confirmingRef.current = false;
   };
 
   // L'usager clique "Non" → fermer le popup, rien d'autre
@@ -188,7 +224,22 @@ export default function BookingPageValidated() {
                     <FormField label="Numéro Chrono *" name="chrono" value={formData.chrono} onChange={handleChange} onBlur={handleBlur} error={errors.chrono} touched={touched.chrono} required placeholder="ABC123" />
                     <FormField label="VIN *" name="vin" value={formData.vin} onChange={handleChange} onBlur={handleBlur} error={errors.vin} touched={touched.vin} required placeholder="VF3AB123CD456789" maxLength={17} />
                   </div>
-                  <FormField label="Immatriculation *" name="immatriculation" value={formData.immatriculation} onChange={handleChange} onBlur={handleBlur} error={errors.immatriculation} touched={touched.immatriculation} required placeholder="AA-123-XX" />
+                  <FormField label="Immatriculation *" name="immatriculation" value={formData.immatriculation} onChange={handleImmatriculationChange} onBlur={handleBlur} error={errors.immatriculation} touched={touched.immatriculation} required placeholder="AA-123-XX" />
+                  {vehicleLookup.loading && (
+                    <p style={{ fontSize: '12px', color: '#64748b', marginTop: '-12px', marginBottom: '12px' }}>
+                      ⏳ Recherche du véhicule...
+                    </p>
+                  )}
+                  {vehicleLookup.found && (
+                    <p style={{ fontSize: '12px', color: '#15803d', marginTop: '-12px', marginBottom: '12px' }}>
+                      ✅ Véhicule trouvé — champs remplis automatiquement
+                    </p>
+                  )}
+                  {vehicleLookup.notFound && (
+                    <p style={{ fontSize: '12px', color: '#92400e', marginTop: '-12px', marginBottom: '12px' }}>
+                      ⚠️ Véhicule non trouvé — remplissez les champs manuellement
+                    </p>
+                  )}
                 </>
               )}
 
@@ -214,8 +265,7 @@ export default function BookingPageValidated() {
                 variant="primary" type="submit"
                 disabled={
                   !formData.centreId || !formData.date || !formData.nom ||
-                  !formData.prenom || !formData.phone
- ||
+                  !formData.prenom || !formData.phone ||
                   (isPIMO && (!formData.vin || !formData.chrono || !formData.immatriculation)) ||
                   isSubmitting
                 }
@@ -231,4 +281,3 @@ export default function BookingPageValidated() {
     </>
   );
 }
-

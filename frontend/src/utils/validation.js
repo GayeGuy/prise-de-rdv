@@ -125,12 +125,21 @@ export function validateForm(formData) {
     if (e) errors.email = e;
   }
 
-  if (formData.centreId && formData.centreId.includes('PIMO')) {
+  const isPIMO   = formData.centreType === 'PIMO';
+  const isReimat = formData.centreType === 'POST_REIMMAT';
+
+  if (isPIMO) {
     if (!formData.chrono?.trim()) errors.chrono = 'Le Chrono est requis';
     else { const e = validateField('chrono', formData.chrono); if (e) errors.chrono = e; }
-
     if (!formData.immatriculation?.trim()) errors.immatriculation = "L'immatriculation est requise";
     else { const e = validateField('immatriculation', formData.immatriculation); if (e) errors.immatriculation = e; }
+    if (!formData.vin?.trim()) errors.vin = 'Le châssis est requis';
+    else { const e = validateField('vin', formData.vin); if (e) errors.vin = e; }
+  } else if (isReimat) {
+    if (!formData.immatriculation?.trim()) errors.immatriculation = "L'immatriculation est requise";
+    else { const e = validateField('immatriculation', formData.immatriculation); if (e) errors.immatriculation = e; }
+    if (!formData.vin?.trim()) errors.vin = 'Le châssis est requis';
+    else { const e = validateField('vin', formData.vin); if (e) errors.vin = e; }
   } else if (formData.immatriculation) {
     const e = validateField('immatriculation', formData.immatriculation);
     if (e) errors.immatriculation = e;

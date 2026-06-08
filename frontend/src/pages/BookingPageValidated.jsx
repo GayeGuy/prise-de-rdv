@@ -116,7 +116,7 @@ export default function BookingPageValidated() {
   const handleCentreChange = (e) => {
     const centreId = e.target.value;
     const centre = centres?.find(c => c.id === centreId);
-    setFormData(prev => ({ ...prev, centreId }));
+    setFormData(prev => ({ ...prev, centreId, centreType: centre?.type || '' }));
     setSelectedCentre(centre);
     setAvailableDates([]);
     if (centreId) {
@@ -173,7 +173,9 @@ export default function BookingPageValidated() {
     );
   }
 
-  const isPIMO = selectedCentre?.type === 'PIMO';
+  const isPIMO     = selectedCentre?.type === 'PIMO';
+  const isReimat   = selectedCentre?.type === 'POST_REIMMAT';
+  const needsVehicleFields = isPIMO || isReimat;
 
   return (
     <>
@@ -239,12 +241,9 @@ export default function BookingPageValidated() {
                 </select>
               </FormField>
 
-              {isPIMO && (
+              {needsVehicleFields && (
                 <>
-                  <div className="grid-2">
-                    <FormField label="Numéro Chrono *" name="chrono" value={formData.chrono} onChange={handleChange} onBlur={handleBlur} error={errors.chrono} touched={touched.chrono} required placeholder="ABC123" />
-                    <FormField label="VIN *" name="vin" value={formData.vin} onChange={handleChange} onBlur={handleBlur} error={errors.vin} touched={touched.vin} required placeholder="VF3AB123CD456789" maxLength={17} />
-                  </div>
+                  {/* Immatriculation — affiché pour PIMO et réimmat */}
                   <FormField label="Immatriculation *" name="immatriculation" value={formData.immatriculation} onChange={handleImmatriculationChange} onBlur={handleBlur} error={errors.immatriculation} touched={touched.immatriculation} required placeholder="AA-123-XX" />
                   {vehicleLookup.loading && (
                     <p style={{ fontSize: '12px', color: '#64748b', marginTop: '-12px', marginBottom: '12px' }}>
@@ -261,6 +260,15 @@ export default function BookingPageValidated() {
                       ⚠️ Véhicule non trouvé — remplissez les champs manuellement
                     </p>
                   )}
+
+                  <div className="grid-2">
+                    {/* Chrono : PIMO uniquement */}
+                    {isPIMO && (
+                      <FormField label="Numéro Chrono *" name="chrono" value={formData.chrono} onChange={handleChange} onBlur={handleBlur} error={errors.chrono} touched={touched.chrono} required placeholder="ABC123" />
+                    )}
+                    {/* VIN/Chassis : PIMO et réimmat */}
+                    <FormField label="Châssis (VIN) *" name="vin" value={formData.vin} onChange={handleChange} onBlur={handleBlur} error={errors.vin} touched={touched.vin} required placeholder="VF3AB123CD456789" maxLength={17} />
+                  </div>
                 </>
               )}
 
@@ -287,7 +295,8 @@ export default function BookingPageValidated() {
                 disabled={
                   !formData.centreId || !formData.date || !formData.nom ||
                   !formData.prenom || !formData.phone ||
-                  (isPIMO && (!formData.vin || !formData.chrono || !formData.immatriculation)) ||
+                  (needsVehicleFields && (!formData.vin || !formData.immatriculation)) ||
+                  (isPIMO && !formData.chrono) ||
                   isSubmitting
                 }
                 loading={isSubmitting}

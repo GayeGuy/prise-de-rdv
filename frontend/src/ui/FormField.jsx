@@ -15,6 +15,7 @@ export function FormField({
   placeholder,
   children,
   maxLength,
+  style,
   ...props
 }) {
   const hasError = touched && error;
@@ -99,7 +100,8 @@ export function FormField({
             transition: 'all 0.2s',
             boxSizing: 'border-box',
             backgroundColor: disabled ? '#f1f5f9' : 'white',
-            cursor: disabled ? 'not-allowed' : 'text'
+            cursor: disabled ? 'not-allowed' : 'text',
+            ...style,
           }}
           {...props}
         />

@@ -264,10 +264,35 @@ export default function BookingPageValidated() {
                   <div className="grid-2">
                     {/* Chrono : PIMO uniquement */}
                     {isPIMO && (
-                      <FormField label="Numéro Chrono *" name="chrono" value={formData.chrono} onChange={handleChange} onBlur={handleBlur} error={errors.chrono} touched={touched.chrono} required placeholder="ABC123" />
+                      <FormField
+                        label="Numéro Chrono *"
+                        name="chrono"
+                        value={formData.chrono}
+                        onChange={handleChange}
+                        onBlur={handleBlur}
+                        error={errors.chrono}
+                        touched={touched.chrono}
+                        required
+                        placeholder="ABC123"
+                        disabled={vehicleLookup.found && !!formData.chrono}
+                        style={vehicleLookup.found && formData.chrono ? { background: '#f1f5f9', color: '#64748b' } : {}}
+                      />
                     )}
                     {/* VIN/Chassis : PIMO et réimmat */}
-                    <FormField label="Châssis (VIN) *" name="vin" value={formData.vin} onChange={handleChange} onBlur={handleBlur} error={errors.vin} touched={touched.vin} required placeholder="VF3AB123CD456789" maxLength={17} />
+                    <FormField
+                      label="Châssis (VIN) *"
+                      name="vin"
+                      value={formData.vin}
+                      onChange={handleChange}
+                      onBlur={handleBlur}
+                      error={errors.vin}
+                      touched={touched.vin}
+                      required
+                      placeholder="VF3AB123CD456789"
+                      maxLength={17}
+                      disabled={vehicleLookup.found && !!formData.vin}
+                      style={vehicleLookup.found && formData.vin ? { background: '#f1f5f9', color: '#64748b' } : {}}
+                    />
                   </div>
                 </>
               )}

@@ -451,7 +451,6 @@ class Store {
       closed: this.data.exceptionallyClosed.filter(e => e.centreId === centreId)
     };
   }
-}
 
   // ── Base véhicules (import CSV) ───────────────────────────────────────────
 

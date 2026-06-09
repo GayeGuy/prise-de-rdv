@@ -48,11 +48,15 @@ function ConfirmModal({ onConfirm, onCancel }) {
 }
 
 export default function BookingPageValidated() {
-  const [selectedCentre, setSelectedCentre] = useState(null);
-  const [availableDates, setAvailableDates] = useState([]);
-  const [result, setResult] = useState(null);
-  const [showAlert, setShowAlert] = useState(null);
-  const [showConfirm, setShowConfirm] = useState(false);
+  const [selectedCentre, setSelectedCentre]   = useState(null);
+  const [availableDates, setAvailableDates]   = useState([]);
+  const [result, setResult]                   = useState(null);
+  const [showAlert, setShowAlert]             = useState(null);
+  const [showConfirm, setShowConfirm]         = useState(false);
+  const [vehicleLookup, setVehicleLookup]     = useState({
+    loading: false, found: false, notFound: false,
+    hasChrono: false,  // true = dossier PIMO, false = dossier réimmat
+  });
   const confirmingRef = useRef(false);
 
   const { data: centres, loading: centresLoading, error: centresError } = useAPI(
@@ -65,7 +69,7 @@ export default function BookingPageValidated() {
     isSubmitting, handleChange, handleBlur,
     validateOnly, submitNow, reset
   } = useForm(
-    { centreId: '', nom: '', prenom: '', phone: '', email: '', date: '', chrono: '', immatriculation: '', vin: '' },
+    { centreId: '', centreType: '', nom: '', prenom: '', phone: '', email: '', date: '', chrono: '', immatriculation: '', vin: '' },
     async (data) => {
       try {
         const appointment = await api.createAppointment(data);
@@ -73,6 +77,9 @@ export default function BookingPageValidated() {
         setResult(appointment);
         setShowAlert({ type: 'success', text: 'Rendez-vous réservé avec succès !' });
         reset();
+        setVehicleLookup({ loading: false, found: false, notFound: false, hasChrono: false });
+        setSelectedCentre(null);
+        setAvailableDates([]);
       } catch (err) {
         setShowAlert({ type: 'error', text: err.message });
       }
@@ -80,42 +87,52 @@ export default function BookingPageValidated() {
     validateForm
   );
 
-  const [vehicleLookup, setVehicleLookup] = useState({ loading: false, found: false, notFound: false });
-
-  // Handler spécial immatriculation : formate + déclenche lookup
+  // ── Lookup immatriculation ──────────────────────────────────────────────
   const handleImmatriculationChange = async (e) => {
-    handleChange(e); // formatage normal
-    const val = e.target.value;
-    const formatted = val.toUpperCase().replace(/[^A-Z0-9\-]/g, '');
+    handleChange(e);
+    const raw = e.target.value.toUpperCase().replace(/[^A-Z0-9\-]/g, '');
 
-    // Reset les champs auto-remplis si l'immatriculation change
-    setFormData(prev => ({ ...prev, chrono: '', vin: '' }));
-    setVehicleLookup({ loading: false, found: false, notFound: false });
+    // Reset centre et champs auto si l'immat change
+    setFormData(prev => ({ ...prev, chrono: '', vin: '', centreId: '', centreType: '' }));
+    setSelectedCentre(null);
+    setAvailableDates([]);
+    setVehicleLookup({ loading: false, found: false, notFound: false, hasChrono: false });
 
-    // Déclencher le lookup seulement si l'immat semble complète (≥ 6 chars)
-    if (formatted.replace(/-/g, '').length >= 6) {
-      setVehicleLookup({ loading: true, found: false, notFound: false });
+    if (raw.replace(/-/g, '').length >= 6) {
+      setVehicleLookup({ loading: true, found: false, notFound: false, hasChrono: false });
       try {
-        const vehicle = await api.lookupVehicle(formatted);
+        const vehicle = await api.lookupVehicle(raw);
         if (vehicle) {
-          // PIMO : remplir chrono + chassis (vin)
-          // POST_REIMMAT : remplir chassis (vin) uniquement
+          const hasChrono = !!(vehicle.chrono);
           setFormData(prev => ({
             ...prev,
-            vin: vehicle.chassis || '',
-            chrono: isPIMO ? (vehicle.chrono || '') : prev.chrono,
+            vin:    vehicle.chassis || '',
+            chrono: vehicle.chrono  || '',
           }));
-          setVehicleLookup({ loading: false, found: true, notFound: false });
+          setVehicleLookup({ loading: false, found: true, notFound: false, hasChrono });
         }
       } catch {
-        setVehicleLookup({ loading: false, found: false, notFound: true });
+        setVehicleLookup({ loading: false, found: false, notFound: true, hasChrono: false });
       }
     }
   };
 
+  // ── Filtrage des centres selon le type de dossier ──────────────────────
+  // • Véhicule trouvé avec chrono → sites PIMO uniquement
+  // • Véhicule trouvé sans chrono → sites POST_REIMMAT uniquement
+  // • Véhicule non trouvé → tous les sites (saisie manuelle)
+  const filteredCentres = (() => {
+    if (!centres) return [];
+    if (!vehicleLookup.found && !vehicleLookup.notFound) return []; // pas encore cherché
+    if (vehicleLookup.notFound) return centres; // tous les sites
+    return centres.filter(c =>
+      vehicleLookup.hasChrono ? c.type === 'PIMO' : c.type === 'POST_REIMMAT'
+    );
+  })();
+
   const handleCentreChange = (e) => {
     const centreId = e.target.value;
-    const centre = centres?.find(c => c.id === centreId);
+    const centre   = centres?.find(c => c.id === centreId);
     setFormData(prev => ({ ...prev, centreId, centreType: centre?.type || '' }));
     setSelectedCentre(centre);
     setAvailableDates([]);
@@ -126,23 +143,19 @@ export default function BookingPageValidated() {
     }
   };
 
-  // Étape 1 : valider le formulaire → afficher le popup si valide
   const handleSubmit = (e) => {
     e.preventDefault();
-    const isValid = validateOnly();
-    if (isValid) setShowConfirm(true);
+    if (validateOnly()) setShowConfirm(true);
   };
 
-  // Étape 2 : l'usager clique "Oui" → soumettre réellement (enregistrement + PDF)
   const handleConfirmYes = async () => {
-    if (confirmingRef.current) return;  // bloquer double appel
+    if (confirmingRef.current) return;
     confirmingRef.current = true;
     setShowConfirm(false);
     await submitNow();
     confirmingRef.current = false;
   };
 
-  // L'usager clique "Non" → fermer le popup, rien d'autre
   const handleConfirmNo = () => setShowConfirm(false);
 
   if (centresLoading) {
@@ -173,9 +186,9 @@ export default function BookingPageValidated() {
     );
   }
 
-  const isPIMO     = selectedCentre?.type === 'PIMO';
-  const isReimat   = selectedCentre?.type === 'POST_REIMMAT';
-  const needsVehicleFields = isPIMO || isReimat;
+  const isPIMO           = selectedCentre?.type === 'PIMO';
+  const isReimat         = selectedCentre?.type === 'POST_REIMMAT';
+  const needsVehicleFields = vehicleLookup.found || vehicleLookup.notFound;
 
   return (
     <>
@@ -214,7 +227,7 @@ export default function BookingPageValidated() {
             </p>
           </CardBody>
           <CardFooter>
-            <Button variant="primary" onClick={() => { setResult(null); setSelectedCentre(null); }}>
+            <Button variant="primary" onClick={() => setResult(null)}>
               Nouveau Rendez-vous
             </Button>
           </CardFooter>
@@ -224,61 +237,53 @@ export default function BookingPageValidated() {
           <CardHeader><h2>📝 Prendre un Rendez-vous</h2></CardHeader>
           <CardBody>
             <form onSubmit={handleSubmit}>
-              <div className="grid-2">
-                <FormField label="Nom" name="nom" value={formData.nom} onChange={handleChange} onBlur={handleBlur} error={errors.nom} touched={touched.nom} required placeholder="DUPONT" />
-                <FormField label="Prénom" name="prenom" value={formData.prenom} onChange={handleChange} onBlur={handleBlur} error={errors.prenom} touched={touched.prenom} required placeholder="JEAN" />
-              </div>
-              <div className="grid-2">
-                <FormField label="Téléphone (10 chiffres)" name="phone" type="tel" value={formData.phone} onChange={handleChange} onBlur={handleBlur} error={errors.phone} touched={touched.phone} required placeholder="0601020304" maxLength={10} />
-                <FormField label="Email" name="email" type="email" value={formData.email} onChange={handleChange} onBlur={handleBlur} error={errors.email} touched={touched.email} placeholder="jean@example.com" />
-              </div>
 
-              <FormField label="Centre *" name="centreId">
-                <select name="centreId" value={formData.centreId} onChange={handleCentreChange} onBlur={handleBlur}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: errors.centreId && touched.centreId ? '2px solid #ef4444' : '1px solid #e2e8f0', fontSize: '14px' }}>
-                  <option value="">-- Sélectionner un centre --</option>
-                  {centres?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </FormField>
+              {/* ── ÉTAPE 1 : Immatriculation ── */}
+              <div style={{
+                background: '#f8fafc', border: '1px solid #e2e8f0',
+                borderRadius: '8px', padding: '14px 16px', marginBottom: '20px',
+              }}>
+                <p style={{ fontSize: '12px', fontWeight: '600', color: '#64748b', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Étape 1 — Identification du véhicule
+                </p>
+                <FormField
+                  label="Immatriculation *"
+                  name="immatriculation"
+                  value={formData.immatriculation}
+                  onChange={handleImmatriculationChange}
+                  onBlur={handleBlur}
+                  error={errors.immatriculation}
+                  touched={touched.immatriculation}
+                  required
+                  placeholder="AA-123-XX"
+                />
+                {vehicleLookup.loading && (
+                  <p style={{ fontSize: '13px', color: '#64748b', margin: '-8px 0 8px' }}>⏳ Recherche du véhicule...</p>
+                )}
+                {vehicleLookup.found && (
+                  <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', padding: '10px 12px', margin: '-8px 0 8px' }}>
+                    <p style={{ fontSize: '13px', color: '#15803d', fontWeight: '600' }}>
+                      ✅ Véhicule trouvé — dossier {vehicleLookup.hasChrono ? 'primo-immatriculation' : 'réimmatriculation'}
+                    </p>
+                    <p style={{ fontSize: '12px', color: '#166534', marginTop: '2px' }}>
+                      Seuls les sites compatibles sont proposés ci-dessous.
+                    </p>
+                  </div>
+                )}
+                {vehicleLookup.notFound && (
+                  <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '6px', padding: '10px 12px', margin: '-8px 0 8px' }}>
+                    <p style={{ fontSize: '13px', color: '#92400e', fontWeight: '600' }}>
+                      ⚠️ Véhicule non trouvé — saisie manuelle requise
+                    </p>
+                    <p style={{ fontSize: '12px', color: '#78350f', marginTop: '2px' }}>
+                      Tous les sites sont disponibles. Remplissez les champs manuellement.
+                    </p>
+                  </div>
+                )}
 
-              {needsVehicleFields && (
-                <>
-                  {/* Immatriculation — affiché pour PIMO et réimmat */}
-                  <FormField label="Immatriculation *" name="immatriculation" value={formData.immatriculation} onChange={handleImmatriculationChange} onBlur={handleBlur} error={errors.immatriculation} touched={touched.immatriculation} required placeholder="AA-123-XX" />
-                  {vehicleLookup.loading && (
-                    <p style={{ fontSize: '12px', color: '#64748b', marginTop: '-12px', marginBottom: '12px' }}>
-                      ⏳ Recherche du véhicule...
-                    </p>
-                  )}
-                  {vehicleLookup.found && (
-                    <p style={{ fontSize: '12px', color: '#15803d', marginTop: '-12px', marginBottom: '12px' }}>
-                      ✅ Véhicule trouvé — champs remplis automatiquement
-                    </p>
-                  )}
-                  {vehicleLookup.notFound && (
-                    <p style={{ fontSize: '12px', color: '#92400e', marginTop: '-12px', marginBottom: '12px' }}>
-                      ⚠️ Véhicule non trouvé — remplissez les champs manuellement
-                    </p>
-                  )}
-
-                  <div className="grid-2">
-                    {/* Chrono : PIMO uniquement */}
-                    {isPIMO && (
-                      <FormField
-                        label="Numéro Chrono *"
-                        name="chrono"
-                        value={formData.chrono}
-                        onChange={handleChange}
-                        onBlur={handleBlur}
-                        error={errors.chrono}
-                        touched={touched.chrono}
-                        required
-                        placeholder="ABC123"
-                        disabled={vehicleLookup.found && !!formData.chrono}
-                        style={vehicleLookup.found && formData.chrono ? { background: '#f1f5f9', color: '#64748b' } : {}}
-                      />
-                    )}
-                    {/* VIN/Chassis : PIMO et réimmat */}
+                {/* Champs VIN et Chrono — affichés dès qu'on a un résultat */}
+                {needsVehicleFields && (
+                  <div className="grid-2" style={{ marginTop: '8px' }}>
                     <FormField
                       label="Châssis (VIN) *"
                       name="vin"
@@ -293,12 +298,75 @@ export default function BookingPageValidated() {
                       disabled={vehicleLookup.found && !!formData.vin}
                       style={vehicleLookup.found && formData.vin ? { background: '#f1f5f9', color: '#64748b' } : {}}
                     />
+                    {/* Chrono : affiché pour PIMO ou si dossier avec chrono */}
+                    {(vehicleLookup.hasChrono || vehicleLookup.notFound) && (
+                      <FormField
+                        label={vehicleLookup.notFound ? "Numéro Chrono (si primo)" : "Numéro Chrono *"}
+                        name="chrono"
+                        value={formData.chrono}
+                        onChange={handleChange}
+                        onBlur={handleBlur}
+                        error={errors.chrono}
+                        touched={touched.chrono}
+                        required={vehicleLookup.hasChrono}
+                        placeholder="ABC123"
+                        disabled={vehicleLookup.found && !!formData.chrono}
+                        style={vehicleLookup.found && formData.chrono ? { background: '#f1f5f9', color: '#64748b' } : {}}
+                      />
+                    )}
                   </div>
-                </>
+                )}
+              </div>
+
+              {/* ── ÉTAPE 2 : Choix du centre (filtré) ── */}
+              {(vehicleLookup.found || vehicleLookup.notFound) && (
+                <div style={{
+                  background: '#f8fafc', border: '1px solid #e2e8f0',
+                  borderRadius: '8px', padding: '14px 16px', marginBottom: '20px',
+                }}>
+                  <p style={{ fontSize: '12px', fontWeight: '600', color: '#64748b', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Étape 2 — Choix du centre
+                    {vehicleLookup.found && (
+                      <span style={{ marginLeft: '8px', background: vehicleLookup.hasChrono ? '#dbeafe' : '#dcfce7', color: vehicleLookup.hasChrono ? '#1e40af' : '#15803d', padding: '2px 8px', borderRadius: '4px', fontSize: '11px' }}>
+                        {vehicleLookup.hasChrono ? 'Sites primo uniquement' : 'Sites réimmat uniquement'}
+                      </span>
+                    )}
+                  </p>
+                  <FormField label="Centre *" name="centreId">
+                    <select
+                      name="centreId"
+                      value={formData.centreId}
+                      onChange={handleCentreChange}
+                      onBlur={handleBlur}
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: errors.centreId && touched.centreId ? '2px solid #ef4444' : '1px solid #e2e8f0', fontSize: '14px' }}
+                    >
+                      <option value="">-- Sélectionner un centre --</option>
+                      {filteredCentres.map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </FormField>
+                </div>
               )}
 
+              {/* ── ÉTAPE 3 : Informations personnelles + Date ── */}
               {selectedCentre && (
-                <div style={{ marginBottom: '20px' }}>
+                <div style={{
+                  background: '#f8fafc', border: '1px solid #e2e8f0',
+                  borderRadius: '8px', padding: '14px 16px', marginBottom: '20px',
+                }}>
+                  <p style={{ fontSize: '12px', fontWeight: '600', color: '#64748b', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Étape 3 — Vos informations
+                  </p>
+                  <div className="grid-2">
+                    <FormField label="Nom" name="nom" value={formData.nom} onChange={handleChange} onBlur={handleBlur} error={errors.nom} touched={touched.nom} required placeholder="DUPONT" />
+                    <FormField label="Prénom" name="prenom" value={formData.prenom} onChange={handleChange} onBlur={handleBlur} error={errors.prenom} touched={touched.prenom} required placeholder="JEAN" />
+                  </div>
+                  <div className="grid-2">
+                    <FormField label="Téléphone (10 chiffres)" name="phone" type="tel" value={formData.phone} onChange={handleChange} onBlur={handleBlur} error={errors.phone} touched={touched.phone} required placeholder="0601020304" maxLength={10} />
+                    <FormField label="Email" name="email" type="email" value={formData.email} onChange={handleChange} onBlur={handleBlur} error={errors.email} touched={touched.email} placeholder="jean@example.com" />
+                  </div>
+
                   <label style={{ display: 'block', marginBottom: '10px', fontWeight: '500', color: '#1e293b', fontSize: '14px' }}>
                     Sélectionner une date *
                   </label>
@@ -315,20 +383,22 @@ export default function BookingPageValidated() {
                 </div>
               )}
 
-              <Button
-                variant="primary" type="submit"
-                disabled={
-                  !formData.centreId || !formData.date || !formData.nom ||
-                  !formData.prenom || !formData.phone ||
-                  (needsVehicleFields && (!formData.vin || !formData.immatriculation)) ||
-                  (isPIMO && !formData.chrono) ||
-                  isSubmitting
-                }
-                loading={isSubmitting}
-                style={{ width: '100%', marginTop: '8px' }}
-              >
-                ✅ Confirmer la Réservation
-              </Button>
+              {selectedCentre && (
+                <Button
+                  variant="primary" type="submit"
+                  disabled={
+                    !formData.centreId || !formData.date || !formData.nom ||
+                    !formData.prenom || !formData.phone || !formData.immatriculation ||
+                    !formData.vin ||
+                    (vehicleLookup.hasChrono && !formData.chrono) ||
+                    isSubmitting
+                  }
+                  loading={isSubmitting}
+                  style={{ width: '100%', marginTop: '8px' }}
+                >
+                  ✅ Confirmer la Réservation
+                </Button>
+              )}
             </form>
           </CardBody>
         </Card>

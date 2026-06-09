@@ -1,16 +1,17 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { handleFieldChange } from '../utils/validation';
 
 export function useForm(initialValues, onSubmit, validate) {
+  const initialValuesRef = useRef(initialValues);
   const [formData, setFormData] = useState(initialValues);
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  /**
-   * Handler générique : formate la valeur en temps réel via handleFieldChange,
-   * puis met à jour formData. Compatible avec FormField (event synthétique).
-   */
+  const onSubmitRef  = useRef(onSubmit);  onSubmitRef.current  = onSubmit;
+  const formDataRef  = useRef(formData);  formDataRef.current  = formData;
+  const validateRef  = useRef(validate);  validateRef.current  = validate;
+
   const handleChange = useCallback((e) => {
     const { name, value } = e.target;
     const formatted = handleFieldChange(name, value);
@@ -20,62 +21,58 @@ export function useForm(initialValues, onSubmit, validate) {
   const handleBlur = useCallback((e) => {
     const { name } = e.target;
     setTouched(prev => ({ ...prev, [name]: true }));
-    // Déclencher la validation live au blur
-    if (validate) {
+    if (validateRef.current) {
       setErrors(prev => {
-        const all = validate({ ...formData });
+        const all = validateRef.current({ ...formDataRef.current });
         return { ...prev, [name]: all[name] };
       });
     }
-  }, [formData, validate]);
+  }, []);
+
+  const validateOnly = useCallback(() => {
+    const data = formDataRef.current;
+    const newErrors = validateRef.current ? validateRef.current(data) : {};
+    setErrors(newErrors);
+    const allTouched = Object.keys(data).reduce((acc, k) => ({ ...acc, [k]: true }), {});
+    setTouched(allTouched);
+    return Object.keys(newErrors).length === 0;
+  }, []);
+
+  const submitNow = useCallback(async () => {
+    setIsSubmitting(true);
+    try {
+      await onSubmitRef.current(formDataRef.current);
+    } catch (err) {
+      console.error('Form submission error:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, []);
 
   const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
-    setIsSubmitting(true);
-
-    const newErrors = validate ? validate(formData) : {};
+    const data = formDataRef.current;
+    const newErrors = validateRef.current ? validateRef.current(data) : {};
     setErrors(newErrors);
-    // Marquer tous les champs comme touchés lors de la soumission
-    const allTouched = Object.keys(formData).reduce((acc, k) => ({ ...acc, [k]: true }), {});
+    const allTouched = Object.keys(data).reduce((acc, k) => ({ ...acc, [k]: true }), {});
     setTouched(allTouched);
-
     if (Object.keys(newErrors).length === 0) {
+      setIsSubmitting(true);
       try {
-        await onSubmit(formData);
-      } catch (error) {
-        console.error('Form submission error:', error);
+        await onSubmitRef.current(data);
+      } catch (err) {
+        console.error('Form submission error:', err);
+      } finally {
+        setIsSubmitting(false);
       }
     }
-
-    setIsSubmitting(false);
-  }, [formData, validate, onSubmit]);
-
-  // Valide sans soumettre — retourne true si le formulaire est valide
-  const validateOnly = useCallback(() => {
-    const newErrors = validate ? validate(formData) : {};
-    setErrors(newErrors);
-    const allTouched = Object.keys(formData).reduce((acc, k) => ({ ...acc, [k]: true }), {});
-    setTouched(allTouched);
-    return Object.keys(newErrors).length === 0;
-  }, [formData, validate]);
+  }, []);
 
   const reset = useCallback(() => {
-    setFormData(initialValues);
+    setFormData(initialValuesRef.current);
     setErrors({});
     setTouched({});
-  }, [initialValues]);
+  }, []);
 
-  return {
-    formData,
-    setFormData,
-    errors,
-    touched,
-    isSubmitting,
-    handleChange,
-    handleBlur,
-    handleSubmit,
-    validateOnly,
-    reset
-  };
+  return { formData, setFormData, errors, touched, isSubmitting, handleChange, handleBlur, handleSubmit, validateOnly, submitNow, reset };
 }
-

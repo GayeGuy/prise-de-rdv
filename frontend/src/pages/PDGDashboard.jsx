@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api';
+import { PDGAppointmentsTab } from '../components/PDGAppointmentsTab';
 
 export default function PDGDashboard() {
   const [stats, setStats] = useState(null);
@@ -34,6 +35,8 @@ export default function PDGDashboard() {
       alert('Erreur lors de l\'export');
     }
   };
+
+  const [activeTab, setActiveTab] = useState('stats');
 
   if (loading) return <div className="loading">Chargement...</div>;
 
@@ -79,6 +82,22 @@ export default function PDGDashboard() {
 
   return (
     <div style={{ padding: '20px' }}>
+
+      {/* Onglets */}
+      <div className="tabs" style={{ marginBottom: '20px' }}>
+        <button className={activeTab === 'stats' ? 'active' : ''} onClick={() => setActiveTab('stats')}>
+          📊 Statistiques
+        </button>
+        <button className={activeTab === 'enregistrements' ? 'active' : ''} onClick={() => setActiveTab('enregistrements')}>
+          📋 Enregistrements
+        </button>
+      </div>
+
+      {activeTab === 'enregistrements' && (
+        <PDGAppointmentsTab centres={centres} />
+      )}
+
+      {activeTab === 'stats' && (
       {/* Header */}
       <div style={{ marginBottom: '30px' }}>
         <h2 style={{ fontSize: '28px', fontWeight: '700', color: '#0f172a', marginBottom: '8px' }}>
@@ -429,6 +448,7 @@ export default function PDGDashboard() {
           </h3>
         </div>
       </div>
+      )} {/* fin activeTab === 'stats' */}
     </div>
   );
 }

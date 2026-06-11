@@ -367,6 +367,66 @@ export default function BookingPageValidated() {
                     <FormField label="Email" name="email" type="email" value={formData.email} onChange={handleChange} onBlur={handleBlur} error={errors.email} touched={touched.email} placeholder="jean@example.com" />
                   </div>
 
+                  {/* Photos carte grise */}
+                  <div style={{ marginBottom: '16px' }}>
+                    <p style={{ fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '10px' }}>
+                      📷 Photos de la carte grise
+                    </p>
+                    <div className="grid-2">
+                      {[
+                        { key: 'photoRecto', label: 'Recto *' },
+                        { key: 'photoVerso', label: 'Verso *' },
+                      ].map(({ key, label }) => (
+                        <div key={key}>
+                          <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>
+                            {label}
+                          </label>
+                          {formData[key] ? (
+                            <div style={{ position: 'relative' }}>
+                              <img
+                                src={formData[key]}
+                                alt={label}
+                                style={{ width: '100%', height: '120px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'block' }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setFormData(prev => ({ ...prev, [key]: '' }))}
+                                style={{
+                                  position: 'absolute', top: '6px', right: '6px',
+                                  background: 'rgba(0,0,0,0.6)', color: 'white', border: 'none',
+                                  borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer',
+                                  fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                }}
+                              >✕</button>
+                            </div>
+                          ) : (
+                            <label style={{
+                              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                              height: '120px', border: '2px dashed #cbd5e1', borderRadius: '8px',
+                              cursor: 'pointer', background: '#f8fafc', gap: '6px',
+                            }}>
+                              <span style={{ fontSize: '24px' }}>📸</span>
+                              <span style={{ fontSize: '12px', color: '#64748b' }}>Appuyer pour prendre une photo</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                capture="environment"
+                                style={{ display: 'none' }}
+                                onChange={(e) => {
+                                  const file = e.target.files[0];
+                                  if (!file) return;
+                                  const reader = new FileReader();
+                                  reader.onload = (ev) => setFormData(prev => ({ ...prev, [key]: ev.target.result }));
+                                  reader.readAsDataURL(file);
+                                }}
+                              />
+                            </label>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                   <label style={{ display: 'block', marginBottom: '10px', fontWeight: '500', color: '#1e293b', fontSize: '14px' }}>
                     Sélectionner une date *
                   </label>

@@ -245,6 +245,14 @@ export const api = {
     link.click();
   },
 
+  async getAppointmentPhotos(id) {
+    return this.request('GET', `/appointments/${id}/photos`);
+  },
+
+  async getAllAppointmentsPDG() {
+    return this.request('GET', '/pdg/appointments');
+  },
+
   // ── Base véhicules ────────────────────────────────────────────────────────
   async lookupVehicle(immatriculation) {
     return this.request('GET', `/vehicles/lookup?immatriculation=${encodeURIComponent(immatriculation)}`);

@@ -3,6 +3,7 @@ import { makeObjectFieldHandler } from '../utils/validation';
 import { api } from '../api';
 import { HolidaysManagerSimple } from '../components/HolidaysManagerSimple';
 import { VehiclesImportTab } from '../components/VehiclesImportTab';
+import { PhotosModal } from '../components/PhotosModal';
 
 const DAYS_FR = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 const DAYS_FULL = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { api } from '../api';
+import { PhotosModal } from '../components/PhotosModal';
 
 const STATUS_LABELS = {
   reserved:  'Réservé',
@@ -15,7 +16,7 @@ export default function AgentDashboard() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
-  useEffect(() => {
+  const [photosModal, setPhotosModal] = useState(null); // { id, reference }
     setSearch('');   // reset recherche à chaque changement d'onglet
     loadAppointments();
   }, [period]);
@@ -60,6 +61,13 @@ export default function AgentDashboard() {
 
   return (
     <div>
+      {photosModal && (
+        <PhotosModal
+          appointmentId={photosModal.id}
+          reference={photosModal.reference}
+          onClose={() => setPhotosModal(null)}
+        />
+      )}
       {message && (
         <div className={`alert ${message.type}`} style={{ marginBottom: '12px' }}>
           {message.text}
@@ -159,8 +167,15 @@ export default function AgentDashboard() {
                       </span>
                     </td>
                     <td>
-                      {a.status === 'reserved' && (
-                        <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+                        <button
+                          onClick={() => setPhotosModal({ id: a.id, reference: a.reference })}
+                          style={{ background: '#8b5cf6', padding: '5px 10px', fontSize: '11px' }}
+                        >
+                          📷 Photos
+                        </button>
+                        {a.status === 'reserved' && (
+                          <>
                           <button
                             onClick={() => handleStatusChange(a.id, 'completed')}
                             style={{ background: '#10b981', padding: '5px 10px', fontSize: '11px' }}
@@ -173,8 +188,9 @@ export default function AgentDashboard() {
                           >
                             ❌ Absent
                           </button>
-                        </div>
-                      )}
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

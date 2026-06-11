@@ -1,9 +1,11 @@
 import express from 'express';
 import store from './lib/store.js';
+import { migrate } from './lib/migrate.js';
 import { getHolidaysForYear, isHoliday } from './lib/holidays-ci.js';
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '20mb' })); // augmenter la limite pour les photos base64
+app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 
 // CORS
 app.use((req, res, next) => {
@@ -30,13 +32,13 @@ function authMiddleware(req, res, next) {
 }
 
 // ===== AUTH =====
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
     return res.status(400).json({ error: 'Missing credentials' });
   }
 
-  const user = store.authenticate(username, password);
+  const user = await store.authenticate(username, password);
   if (!user) {
     return res.status(401).json({ error: 'Invalid credentials' });
   }
@@ -46,13 +48,13 @@ app.post('/api/auth/login', (req, res) => {
 });
 
 // ===== CENTRES =====
-app.get('/api/centres', (req, res) => {
-  res.json(store.getCentres());
+app.get('/api/centres', async (req, res) => {
+  res.json(await store.getCentres());
 });
 
-app.get('/api/centres/:id/availability', (req, res) => {
+app.get('/api/centres/:id/availability', async (req, res) => {
   const daysAhead = parseInt(req.query.daysAhead) || 30;
-  const centre = store.getCentre(req.params.id);
+  const centre = await store.getCentre(req.params.id);
   if (!centre) return res.status(404).json({ error: 'Centre not found' });
 
   const availability = [];
@@ -64,14 +66,14 @@ app.get('/api/centres/:id/availability', (req, res) => {
     const dayLetter = ['D', 'L', 'M', 'M', 'J', 'V', 'S'][dayOfWeek];
 
     // Check if closed
-    const isClosed = store.getClosures().some(c => c.date === dateStr);
+    const isClosed = await store.getClosures().some(c => c.date === dateStr);
     
     // Check if it's a working day
     const isWorkDay = centre.workDays.includes(dayLetter);
     
     // Get capacity (exceptional or default)
     let capacity = centre.dailyCapacity;
-    const exceptionalCap = store.getExceptionalCapacityForDate(centre.id, dateStr);
+    const exceptionalCap = await store.getExceptionalCapacityForDate(centre.id, dateStr);
     if (exceptionalCap) {
       capacity = exceptionalCap.capacity;
     }
@@ -91,32 +93,32 @@ app.get('/api/centres/:id/availability', (req, res) => {
   res.json(availability);
 });
 
-app.post('/api/admin/centres', authMiddleware, (req, res) => {
+app.post('/api/admin/centres', authMiddleware, async (req, res) => {
   if (!req.user || req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Admin only' });
   }
-  const centre = store.createCentre(req.body);
+  const centre = await store.createCentre(req.body);
   res.json(centre);
 });
 
-app.put('/api/admin/centres/:id', authMiddleware, (req, res) => {
+app.put('/api/admin/centres/:id', authMiddleware, async (req, res) => {
   if (!req.user || req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Admin only' });
   }
-  const centre = store.updateCentre(req.params.id, req.body);
+  const centre = await store.updateCentre(req.params.id, req.body);
   if (!centre) return res.status(404).json({ error: 'Centre not found' });
   res.json(centre);
 });
 
 // ===== APPOINTMENTS =====
-app.post('/api/appointments', (req, res) => {
+app.post('/api/appointments', async (req, res) => {
   const { nom, prenom, phone, email, date, centreId, chrono, immatriculation, vin } = req.body;
   
   if (!nom || !prenom || !phone || !date || !centreId) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
-  const centre = store.getCentre(centreId);
+  const centre = await store.getCentre(centreId);
   if (!centre) return res.status(404).json({ error: 'Centre not found' });
 
   if (centre.type === 'PIMO' && !chrono) {
@@ -134,7 +136,7 @@ app.post('/api/appointments', (req, res) => {
     return res.status(400).json({ error: 'Immatriculation already booked' });
   }
 
-  const appointment = store.createAppointment({
+  const appointment = await store.createAppointment({
     nom,
     prenom,
     phone: phone.replace(/\s/g, ''),
@@ -149,82 +151,82 @@ app.post('/api/appointments', (req, res) => {
   res.json(appointment);
 });
 
-app.get('/api/appointments/:reference', (req, res) => {
-  const appointment = store.getAppointment(req.params.reference);
+app.get('/api/appointments/:reference', async (req, res) => {
+  const appointment = await store.getAppointment(req.params.reference);
   if (!appointment) return res.status(404).json({ error: 'Not found' });
   res.json(appointment);
 });
 
-app.get('/api/appointments/search/:value', (req, res) => {
+app.get('/api/appointments/search/:value', async (req, res) => {
   const value = req.params.value;
   let appointments = [];
 
   if (/^\d{7,}$/.test(value.replace(/\s/g, ''))) {
-    appointments = store.searchAppointmentsByPhone(value);
+    appointments = await store.searchAppointmentsByPhone(value);
   } else if (/^RDV-/.test(value)) {
-    const appt = store.getAppointment(value);
+    const appt = await store.getAppointment(value);
     appointments = appt ? [appt] : [];
   }
 
   res.json(appointments);
 });
 
-app.get('/api/appointments/search/chrono/:chrono', (req, res) => {
-  const appointments = store.searchAppointmentsByChrono(req.params.chrono);
+app.get('/api/appointments/search/chrono/:chrono', async (req, res) => {
+  const appointments = await store.searchAppointmentsByChrono(req.params.chrono);
   res.json(appointments);
 });
 
-app.get('/api/appointments/search/vin/:vin', (req, res) => {
-  const appointments = store.searchAppointmentsByVIN(req.params.vin);
+app.get('/api/appointments/search/vin/:vin', async (req, res) => {
+  const appointments = await store.searchAppointmentsByVIN(req.params.vin);
   res.json(appointments);
 });
 
-app.get('/api/appointments/search/immatriculation/:immatriculation', (req, res) => {
-  const appointments = store.searchAppointmentsByImmatriculation(req.params.immatriculation);
+app.get('/api/appointments/search/immatriculation/:immatriculation', async (req, res) => {
+  const appointments = await store.searchAppointmentsByImmatriculation(req.params.immatriculation);
   res.json(appointments);
 });
 
-app.delete('/api/appointments/:reference', (req, res) => {
-  const appointment = store.cancelAppointment(req.params.reference);
+app.delete('/api/appointments/:reference', async (req, res) => {
+  const appointment = await store.cancelAppointment(req.params.reference);
   if (!appointment) return res.status(404).json({ error: 'Not found' });
   res.json(appointment);
 });
 
-app.patch('/api/appointments/:id', (req, res) => {
+app.patch('/api/appointments/:id', async (req, res) => {
   const { nom, prenom, phone, email, date } = req.body;
   if (!nom || !prenom || !phone || !date) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
-  const appointment = store.updateAppointment(req.params.id, { nom, prenom, phone, email, date });
+  const appointment = await store.updateAppointment(req.params.id, { nom, prenom, phone, email, date });
   if (!appointment) return res.status(404).json({ error: 'Not found' });
   res.json(appointment);
 });
 
 // ===== AGENT =====
-app.get('/api/agent/appointments', authMiddleware, (req, res) => {
+app.get('/api/agent/appointments', authMiddleware, async (req, res) => {
   if (!req.user || req.user.role !== 'agent') {
     return res.status(403).json({ error: 'Agent only' });
   }
 
   const period = req.query.period || 'all';
-  const appointments = store.getAgentAppointments(req.user.id, period);
+  const appointments = await store.getAgentAppointments(req.user.id, period);
   res.json(appointments);
 });
 
-app.patch('/api/agent/appointments/:id/status', authMiddleware, (req, res) => {
+app.patch('/api/agent/appointments/:id/status', authMiddleware, async (req, res) => {
   if (!req.user || req.user.role !== 'agent') {
     return res.status(403).json({ error: 'Agent only' });
   }
 
   const { status } = req.body;
-  const appointment = store.updateAppointmentStatus(req.params.id, status);
+  const appointment = await store.updateAppointmentStatus(req.params.id, status);
   if (!appointment) return res.status(404).json({ error: 'Not found' });
   res.json(appointment);
 });
 
 // ===== ADMIN =====
-app.post('/api/admin/agents', authMiddleware, (req, res) => {
+app.post('/api/admin/agents', authMiddleware, async (req, res) => {
   if (!req.user || req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Admin only' });
   }
@@ -234,54 +236,54 @@ app.post('/api/admin/agents', authMiddleware, (req, res) => {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
-  const agent = store.createAgent({ username, password, name, email, centreId });
+  const agent = await store.createAgent({ username, password, name, email, centreId });
   res.json(agent);
 });
 
-app.get('/api/admin/agents', authMiddleware, (req, res) => {
+app.get('/api/admin/agents', authMiddleware, async (req, res) => {
   if (!req.user || req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Admin only' });
   }
 
-  res.json(store.getAgents());
+  res.json(await store.getAgents());
 });
 
-app.patch('/api/admin/agents/:id', authMiddleware, (req, res) => {
+app.patch('/api/admin/agents/:id', authMiddleware, async (req, res) => {
   if (!req.user || req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Admin only' });
   }
 
-  const agent = store.updateAgent(req.params.id, req.body);
+  const agent = await store.updateAgent(req.params.id, req.body);
   if (!agent) return res.status(404).json({ error: 'Agent not found' });
   res.json(agent);
 });
 
-app.delete('/api/admin/agents/:id', authMiddleware, (req, res) => {
+app.delete('/api/admin/agents/:id', authMiddleware, async (req, res) => {
   if (!req.user || req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Admin only' });
   }
 
-  store.deleteAgent(req.params.id);
+  await store.deleteAgent(req.params.id);
   res.json({ deleted: true });
 });
 
-app.get('/api/admin/stats', authMiddleware, (req, res) => {
+app.get('/api/admin/stats', authMiddleware, async (req, res) => {
   if (!req.user || req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Admin only' });
   }
 
-  res.json(store.getStats());
+  res.json(await store.getStats());
 });
 
-app.get('/api/admin/closures', authMiddleware, (req, res) => {
+app.get('/api/admin/closures', authMiddleware, async (req, res) => {
   if (!req.user || req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Admin only' });
   }
 
-  res.json(store.getClosures());
+  res.json(await store.getClosures());
 });
 
-app.post('/api/admin/closures', authMiddleware, (req, res) => {
+app.post('/api/admin/closures', authMiddleware, async (req, res) => {
   if (!req.user || req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Admin only' });
   }
@@ -289,29 +291,35 @@ app.post('/api/admin/closures', authMiddleware, (req, res) => {
   const { date } = req.body;
   if (!date) return res.status(400).json({ error: 'Missing date' });
 
-  const closure = store.addClosure({ date });
+  const closure = await store.addClosure({ date });
   res.json(closure);
 });
 
-app.delete('/api/admin/closures/:id', authMiddleware, (req, res) => {
+app.delete('/api/admin/closures/:id', authMiddleware, async (req, res) => {
   if (!req.user || req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Admin only' });
   }
 
-  store.deleteClosure(req.params.id);
+  await store.deleteClosure(req.params.id);
   res.json({ deleted: true });
 });
 
 // ===== PDG =====
-app.get('/api/pdg/stats', authMiddleware, (req, res) => {
+app.get('/api/pdg/appointments', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'pdg' && req.user.role !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
+  const appointments = await store.getAllAppointments();
+  res.json(appointments);
+});
+
+app.get('/api/pdg/stats', authMiddleware, async (req, res) => {
   if (!req.user || req.user.role !== 'pdg') {
     return res.status(403).json({ error: 'PDG only' });
   }
 
-  res.json(store.getPDGStats());
+  res.json(await store.getPDGStats());
 });
 
-app.get('/api/pdg/export', authMiddleware, (req, res) => {
+app.get('/api/pdg/export', authMiddleware, async (req, res) => {
   if (!req.user || req.user.role !== 'pdg') {
     return res.status(403).json({ error: 'PDG only' });
   }
@@ -320,26 +328,26 @@ app.get('/api/pdg/export', authMiddleware, (req, res) => {
 });
 
 // Update closure
-app.patch('/api/admin/closures/:id', authMiddleware, (req, res) => {
+app.patch('/api/admin/closures/:id', authMiddleware, async (req, res) => {
   if (!req.user || req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Admin only' });
   }
 
-  const closure = store.updateClosure(req.params.id, req.body);
+  const closure = await store.updateClosure(req.params.id, req.body);
   if (!closure) return res.status(404).json({ error: 'Closure not found' });
   res.json(closure);
 });
 
 // Holidays
-app.get('/api/admin/holidays', authMiddleware, (req, res) => {
+app.get('/api/admin/holidays', authMiddleware, async (req, res) => {
   if (!req.user || req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Admin only' });
   }
 
-  res.json(store.getHolidays());
+  res.json(await store.getHolidays());
 });
 
-app.post('/api/admin/holidays', authMiddleware, (req, res) => {
+app.post('/api/admin/holidays', authMiddleware, async (req, res) => {
   if (!req.user || req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Admin only' });
   }
@@ -347,29 +355,29 @@ app.post('/api/admin/holidays', authMiddleware, (req, res) => {
   const { date, name } = req.body;
   if (!date || !name) return res.status(400).json({ error: 'Missing date or name' });
 
-  const holiday = store.addHoliday({ date, name });
+  const holiday = await store.addHoliday({ date, name });
   res.json(holiday);
 });
 
-app.delete('/api/admin/holidays/:id', authMiddleware, (req, res) => {
+app.delete('/api/admin/holidays/:id', authMiddleware, async (req, res) => {
   if (!req.user || req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Admin only' });
   }
 
-  store.deleteHoliday(req.params.id);
+  await store.deleteHoliday(req.params.id);
   res.json({ deleted: true });
 });
 
 // Exceptional Capacities
-app.get('/api/admin/exceptional-capacities', authMiddleware, (req, res) => {
+app.get('/api/admin/exceptional-capacities', authMiddleware, async (req, res) => {
   if (!req.user || req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Admin only' });
   }
 
-  res.json(store.getExceptionalCapacities());
+  res.json(await store.getExceptionalCapacities());
 });
 
-app.post('/api/admin/exceptional-capacities', authMiddleware, (req, res) => {
+app.post('/api/admin/exceptional-capacities', authMiddleware, async (req, res) => {
   if (!req.user || req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Admin only' });
   }
@@ -405,31 +413,31 @@ app.post('/api/admin/exceptional-capacities', authMiddleware, (req, res) => {
     data.weekday = weekday;
   }
 
-  const ec = store.addExceptionalCapacity(data);
+  const ec = await store.addExceptionalCapacity(data);
   res.json(ec);
 });
 
-app.patch('/api/admin/exceptional-capacities/:id', authMiddleware, (req, res) => {
+app.patch('/api/admin/exceptional-capacities/:id', authMiddleware, async (req, res) => {
   if (!req.user || req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Admin only' });
   }
 
-  const updated = store.updateExceptionalCapacity(req.params.id, req.body);
+  const updated = await store.updateExceptionalCapacity(req.params.id, req.body);
   if (!updated) return res.status(404).json({ error: 'Not found' });
   res.json(updated);
 });
 
-app.delete('/api/admin/exceptional-capacities/:id', authMiddleware, (req, res) => {
+app.delete('/api/admin/exceptional-capacities/:id', authMiddleware, async (req, res) => {
   if (!req.user || req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Admin only' });
   }
 
-  store.deleteExceptionalCapacity(req.params.id);
+  await store.deleteExceptionalCapacity(req.params.id);
   res.json({ deleted: true });
 });
 
 // ===== JOURS FÉRIÉS =====
-app.get('/api/holidays', (req, res) => {
+app.get('/api/holidays', async (req, res) => {
   try {
     const year = parseInt(req.query.year) || new Date().getFullYear();
     const holidays = getHolidaysForYear(year);
@@ -439,7 +447,7 @@ app.get('/api/holidays', (req, res) => {
   }
 });
 
-app.post('/api/admin/exceptional-days/open', authMiddleware, (req, res) => {
+app.post('/api/admin/exceptional-days/open', authMiddleware, async (req, res) => {
   if (!req.user || req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Admin only' });
   }
@@ -448,11 +456,11 @@ app.post('/api/admin/exceptional-days/open', authMiddleware, (req, res) => {
   if (!centreId || !date) {
     return res.status(400).json({ error: 'centreId et date requis' });
   }
-  const entry = store.addExceptionallyOpen(centreId, date, reason);
+  const entry = await store.addExceptionallyOpen(centreId, date, reason);
   res.json(entry);
 });
 
-app.post('/api/admin/exceptional-days/closed', authMiddleware, (req, res) => {
+app.post('/api/admin/exceptional-days/closed', authMiddleware, async (req, res) => {
   if (!req.user || req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Admin only' });
   }
@@ -461,11 +469,11 @@ app.post('/api/admin/exceptional-days/closed', authMiddleware, (req, res) => {
   if (!centreId || !date) {
     return res.status(400).json({ error: 'centreId et date requis' });
   }
-  const entry = store.addExceptionallyClosed(centreId, date, reason);
+  const entry = await store.addExceptionallyClosed(centreId, date, reason);
   res.json(entry);
 });
 
-app.delete('/api/admin/exceptional-days/:id', authMiddleware, (req, res) => {
+app.delete('/api/admin/exceptional-days/:id', authMiddleware, async (req, res) => {
   if (!req.user || req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Admin only' });
   }
@@ -474,63 +482,84 @@ app.delete('/api/admin/exceptional-days/:id', authMiddleware, (req, res) => {
   const isOpen = store.data.exceptionallyOpen.some(e => e.id === id);
   
   if (isOpen) {
-    store.removeExceptionallyOpen(id);
+    await store.removeExceptionallyOpen(id);
   } else {
-    store.removeExceptionallyClosed(id);
+    await store.removeExceptionallyClosed(id);
   }
   
   res.json({ success: true });
 });
 
-app.get('/api/admin/centres/:centreId/exceptions', authMiddleware, (req, res) => {
+app.get('/api/admin/centres/:centreId/exceptions', authMiddleware, async (req, res) => {
   if (!req.user || req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Admin only' });
   }
 
   const { centreId } = req.params;
-  const exceptions = store.getExceptionalDaysForCentre(centreId);
+  const exceptions = await store.getExceptionalDaysForCentre(centreId);
   res.json(exceptions);
 });
 
 // Start server
+// ── Photos carte grise ───────────────────────────────────────────────────
+
+// Récupérer les photos d'un RDV (agents, admin, PDG)
+app.get('/api/appointments/:id/photos', authMiddleware, async (req, res) => {
+  const appointment = await store.getAppointmentById(req.params.id);
+  if (!appointment) return res.status(404).json({ error: 'RDV non trouvé' });
+  res.json({
+    photoRecto: appointment.photoRecto || null,
+    photoVerso: appointment.photoVerso || null,
+  });
+});
+
 // ── Base véhicules ────────────────────────────────────────────────────────
 
 // Lookup public (utilisé par le formulaire de RDV)
-app.get('/api/vehicles/lookup', (req, res) => {
+app.get('/api/vehicles/lookup', async (req, res) => {
   const { immatriculation } = req.query;
   if (!immatriculation) return res.status(400).json({ error: 'immatriculation requis' });
-  const vehicle = store.lookupVehicle(immatriculation);
+  const vehicle = await store.lookupVehicle(immatriculation);
   if (!vehicle) return res.status(404).json({ error: 'Véhicule non trouvé' });
   res.json(vehicle);
 });
 
 // Import CSV (admin uniquement)
-app.post('/api/admin/vehicles/import', authMiddleware, (req, res) => {
+app.post('/api/admin/vehicles/import', authMiddleware, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
   const { rows } = req.body;
   if (!Array.isArray(rows) || rows.length === 0) {
     return res.status(400).json({ error: 'Données invalides' });
   }
-  const result = store.importVehicles(rows);
+  const result = await store.importVehicles(rows);
   res.json(result);
 });
 
 // Liste véhicules (admin)
-app.get('/api/admin/vehicles', authMiddleware, (req, res) => {
+app.get('/api/admin/vehicles', authMiddleware, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
-  const vehicles = store.getVehicles();
+  const vehicles = await store.getVehicles();
   res.json(vehicles);
 });
 
 // Supprimer tous les véhicules (admin)
-app.delete('/api/admin/vehicles', authMiddleware, (req, res) => {
+app.delete('/api/admin/vehicles', authMiddleware, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
-  store.deleteAllVehicles();
+  await store.deleteAllVehicles();
   res.json({ success: true });
 });
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log(`✅ Server running on port ${PORT}`);
-  console.log(`📝 API: http://localhost:${PORT}`);
-});
+
+// Démarrage avec migration
+migrate()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`✅ Server running on port ${PORT}`);
+      console.log(`📝 API: http://localhost:${PORT}`);
+    });
+  })
+  .catch(err => {
+    console.error('❌ Migration failed:', err);
+    process.exit(1);
+  });

@@ -98,6 +98,7 @@ export default function PDGDashboard() {
       )}
 
       {activeTab === 'stats' && (
+      <div>
       {/* Header */}
       <div style={{ marginBottom: '30px' }}>
         <h2 style={{ fontSize: '28px', fontWeight: '700', color: '#0f172a', marginBottom: '8px' }}>
@@ -447,6 +448,7 @@ export default function PDGDashboard() {
               : 0}
           </h3>
         </div>
+      </div>
       </div>
       )} {/* fin activeTab === 'stats' */}
     </div>

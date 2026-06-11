@@ -43,8 +43,8 @@ export default function PDGDashboard() {
   const regions = [...new Set(centres.map(c => c.region))];
   
   const filteredCentres = selectedRegion === 'all' 
-    ? stats?.byCentre || [] 
-    : (stats?.byCentre || []).filter(c => {
+    ? stats?.byCenter || []
+: (stats?.byCenter || []).filter(c => {
         const centre = centres.find(x => x.id === c.centreId);
         return centre?.region === selectedRegion;
       });

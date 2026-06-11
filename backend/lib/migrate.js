@@ -112,12 +112,12 @@ export async function migrate() {
 
   // Centres par défaut — ON CONFLICT sur id (safe)
   await query(`
-    INSERT INTO centres (id, code, name, type, region, commune, address, daily_capacity, work_days, include_holidays, status)
-    VALUES
-      ('centre1', 'C001', 'Centre PIMO Abidjan',          'PIMO',        'Abidjan', 'Abidjan', '123 Rue du Port',   50, '["L","M","M","J","V"]', false, 'active'),
-      ('centre2', 'C002', 'Centre Immatriculation Cocody', 'POST_REIMMAT','Cocody',  'Cocody',  '456 Av. des Nations',40, '["L","M","M","J","V"]', false, 'active')
-    ON CONFLICT (id) DO NOTHING
-  `);
+  INSERT INTO centres (id, code, name, type, region, commune, address, daily_capacity, work_days, include_holidays, status)
+  VALUES
+    ('centre1', 'C001', 'Centre PIMO Abidjan',          'PIMO',        'Abidjan', 'Abidjan', '123 Rue du Port',    50, '["L","M","M","J","V"]', false, 'active'),
+    ('centre2', 'C002', 'Centre Immatriculation Cocody', 'POST_REIMMAT','Cocody',  'Cocody',  '456 Av. des Nations', 40, '["L","M","M","J","V"]', false, 'active')
+  ON CONFLICT (id) DO NOTHING
+`);
 
   // Comptes par défaut — ON CONFLICT sur username (corrigé)
   await query(`

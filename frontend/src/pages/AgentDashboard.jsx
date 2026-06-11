@@ -15,8 +15,9 @@ export default function AgentDashboard() {
   const [message, setMessage] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-
   const [photosModal, setPhotosModal] = useState(null); // { id, reference }
+
+  useEffect(() => {
     setSearch('');   // reset recherche à chaque changement d'onglet
     loadAppointments();
   }, [period]);

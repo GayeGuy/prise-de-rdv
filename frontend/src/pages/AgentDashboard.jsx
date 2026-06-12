@@ -9,16 +9,34 @@ const STATUS_LABELS = {
   cancelled: 'Annulé',
 };
 
+const STATUS_COLORS = {
+  reserved:  { bg: '#dbeafe', color: '#1e40af' },
+  completed: { bg: '#dcfce7', color: '#15803d' },
+  absent:    { bg: '#fee2e2', color: '#991b1b' },
+  cancelled: { bg: '#f3f4f6', color: '#374151' },
+};
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 640);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+  return isMobile;
+}
+
 export default function AgentDashboard() {
   const [appointments, setAppointments] = useState([]);
-  const [period, setPeriod] = useState('today');
-  const [message, setMessage] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [photosModal, setPhotosModal] = useState(null); // { id, reference }
+  const [period, setPeriod]             = useState('today');
+  const [message, setMessage]           = useState(null);
+  const [loading, setLoading]           = useState(true);
+  const [search, setSearch]             = useState('');
+  const [photosModal, setPhotosModal]   = useState(null);
+  const isMobile                        = useIsMobile();
 
   useEffect(() => {
-    setSearch('');   // reset recherche à chaque changement d'onglet
+    setSearch('');
     loadAppointments();
   }, [period]);
 
@@ -45,7 +63,6 @@ export default function AgentDashboard() {
     }
   };
 
-  // Filtrage local selon le terme de recherche
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return appointments;
@@ -82,11 +99,7 @@ export default function AgentDashboard() {
           { key: 'upcoming', label: '🔮 À venir' },
           { key: 'past',     label: '📜 Passés' },
         ].map(({ key, label }) => (
-          <button
-            key={key}
-            className={period === key ? 'active' : ''}
-            onClick={() => setPeriod(key)}
-          >
+          <button key={key} className={period === key ? 'active' : ''} onClick={() => setPeriod(key)}>
             {label}
           </button>
         ))}
@@ -104,7 +117,7 @@ export default function AgentDashboard() {
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Rechercher par nom, référence, téléphone, immatriculation..."
+              placeholder="Rechercher par nom, référence, téléphone..."
               style={{
                 width: '100%', padding: '9px 12px 9px 34px',
                 border: '1px solid #e2e8f0', borderRadius: '8px',
@@ -120,9 +133,7 @@ export default function AgentDashboard() {
                 padding: '8px 12px', borderRadius: '8px', fontSize: '13px',
                 flexShrink: 0, boxShadow: 'none',
               }}
-            >
-              ✕ Effacer
-            </button>
+            >✕</button>
           )}
         </div>
 
@@ -131,7 +142,7 @@ export default function AgentDashboard() {
           <h3 style={{ margin: 0 }}>Rendez-vous</h3>
           <span style={{ fontSize: '13px', color: '#64748b' }}>
             {search
-              ? `${filtered.length} résultat${filtered.length > 1 ? 's' : ''} sur ${appointments.length}`
+              ? `${filtered.length} / ${appointments.length}`
               : `${appointments.length} rendez-vous`}
           </span>
         </div>
@@ -142,7 +153,82 @@ export default function AgentDashboard() {
           <p style={{ color: '#64748b', fontSize: '14px', padding: '20px 0' }}>
             {search ? `Aucun résultat pour "${search}"` : 'Aucun rendez-vous'}
           </p>
+        ) : isMobile ? (
+          /* ── MOBILE : cards ── */
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {filtered.map(a => {
+              const sc = STATUS_COLORS[a.status] || STATUS_COLORS.cancelled;
+              return (
+                <div key={a.id} style={{
+                  border: '1px solid #e2e8f0', borderRadius: '10px',
+                  padding: '14px', background: 'white',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                }}>
+                  {/* Ligne 1 : référence + statut */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: '700', color: '#475569', letterSpacing: '0.3px' }}>
+                      {a.reference}
+                    </span>
+                    <span style={{
+                      background: sc.bg, color: sc.color,
+                      padding: '3px 8px', borderRadius: '5px', fontSize: '11px', fontWeight: '600',
+                    }}>
+                      {STATUS_LABELS[a.status] || a.status}
+                    </span>
+                  </div>
+
+                  {/* Ligne 2 : nom + date */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '6px' }}>
+                    <span style={{ fontWeight: '600', fontSize: '15px', color: '#0f172a' }}>
+                      {a.prenom} {a.nom}
+                    </span>
+                    <span style={{ fontSize: '12px', color: '#64748b' }}>
+                      {new Date(a.date).toLocaleDateString('fr-FR')}
+                    </span>
+                  </div>
+
+                  {/* Ligne 3 : téléphone */}
+                  <div style={{ fontSize: '13px', color: '#475569', marginBottom: '10px' }}>
+                    📞 <a href={`tel:${a.phone}`} style={{ color: '#3b82f6', textDecoration: 'none' }}>{a.phone}</a>
+                    {a.immatriculation && (
+                      <span style={{ marginLeft: '12px', color: '#64748b' }}>🚗 {a.immatriculation}</span>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <button
+                      onClick={() => setPhotosModal({ id: a.id, reference: a.reference })}
+                      style={{
+                        background: '#8b5cf6', color: 'white', border: 'none',
+                        padding: '7px 12px', borderRadius: '7px', fontSize: '12px', cursor: 'pointer',
+                      }}
+                    >📷 Photos</button>
+                    {a.status === 'reserved' && (
+                      <>
+                        <button
+                          onClick={() => handleStatusChange(a.id, 'completed')}
+                          style={{
+                            background: '#10b981', color: 'white', border: 'none',
+                            padding: '7px 12px', borderRadius: '7px', fontSize: '12px', cursor: 'pointer',
+                          }}
+                        >✅ Réalisé</button>
+                        <button
+                          onClick={() => handleStatusChange(a.id, 'absent')}
+                          style={{
+                            background: '#ef4444', color: 'white', border: 'none',
+                            padding: '7px 12px', borderRadius: '7px', fontSize: '12px', cursor: 'pointer',
+                          }}
+                        >❌ Absent</button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         ) : (
+          /* ── DESKTOP : tableau ── */
           <div style={{ overflowX: 'auto' }}>
             <table>
               <thead>
@@ -156,45 +242,45 @@ export default function AgentDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(a => (
-                  <tr key={a.id}>
-                    <td style={{ fontWeight: 'bold', fontSize: '12px', whiteSpace: 'nowrap' }}>{a.reference}</td>
-                    <td style={{ whiteSpace: 'nowrap' }}>{new Date(a.date).toLocaleDateString('fr-FR')}</td>
-                    <td>{a.prenom} {a.nom}</td>
-                    <td>{a.phone}</td>
-                    <td>
-                      <span className={`badge ${a.status}`}>
-                        {STATUS_LABELS[a.status] || a.status}
-                      </span>
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
-                        <button
-                          onClick={() => setPhotosModal({ id: a.id, reference: a.reference })}
-                          style={{ background: '#8b5cf6', padding: '5px 10px', fontSize: '11px' }}
-                        >
-                          📷 Photos
-                        </button>
-                        {a.status === 'reserved' && (
-                          <>
+                {filtered.map(a => {
+                  const sc = STATUS_COLORS[a.status] || STATUS_COLORS.cancelled;
+                  return (
+                    <tr key={a.id}>
+                      <td style={{ fontWeight: 'bold', fontSize: '12px', whiteSpace: 'nowrap' }}>{a.reference}</td>
+                      <td style={{ whiteSpace: 'nowrap' }}>{new Date(a.date).toLocaleDateString('fr-FR')}</td>
+                      <td>{a.prenom} {a.nom}</td>
+                      <td>{a.phone}</td>
+                      <td>
+                        <span style={{
+                          background: sc.bg, color: sc.color,
+                          padding: '3px 8px', borderRadius: '5px', fontSize: '11px', fontWeight: '600',
+                        }}>
+                          {STATUS_LABELS[a.status] || a.status}
+                        </span>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
                           <button
-                            onClick={() => handleStatusChange(a.id, 'completed')}
-                            style={{ background: '#10b981', padding: '5px 10px', fontSize: '11px' }}
-                          >
-                            ✅ Réalisé
-                          </button>
-                          <button
-                            onClick={() => handleStatusChange(a.id, 'absent')}
-                            style={{ background: '#ef4444', padding: '5px 10px', fontSize: '11px' }}
-                          >
-                            ❌ Absent
-                          </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                            onClick={() => setPhotosModal({ id: a.id, reference: a.reference })}
+                            style={{ background: '#8b5cf6', padding: '5px 10px', fontSize: '11px' }}
+                          >📷 Photos</button>
+                          {a.status === 'reserved' && (
+                            <>
+                              <button
+                                onClick={() => handleStatusChange(a.id, 'completed')}
+                                style={{ background: '#10b981', padding: '5px 10px', fontSize: '11px' }}
+                              >✅ Réalisé</button>
+                              <button
+                                onClick={() => handleStatusChange(a.id, 'absent')}
+                                style={{ background: '#ef4444', padding: '5px 10px', fontSize: '11px' }}
+                              >❌ Absent</button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

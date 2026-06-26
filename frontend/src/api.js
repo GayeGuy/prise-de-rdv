@@ -184,7 +184,7 @@ export const api = {
   },
 
   async getHolidays(year = new Date().getFullYear()) {
-    return this.request('GET', `/holidays?year=${year}`);
+    return this.request('GET', `/admin/holidays?year=${year}`);
   },
 
   async addExceptionallyOpen(centreId, date, reason = '') {
